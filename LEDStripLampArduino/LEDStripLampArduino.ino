@@ -19,11 +19,10 @@ FASTLED_USING_NAMESPACE
 int total_leds = LEDS_PER_ROW * NUM_ROWS * NUM_SIDES;
 CRGB leds[TOTAL_LEDS];
 
-
 int rotationOffset = 0;
 int fadingStepMax = 20;
 int fadingStepCounter = 0;
-
+int speedUpFactor = 0;
 
 void setup() 
 {
@@ -38,65 +37,71 @@ void loop()
   uint8_t R[4] = {200, 0, 0, 200};
   uint8_t G[4] = {0, 200, 0, 200};
   uint8_t B[4] = {0, 0, 200, 200};
+
+  
+  FastLED.show();
 }
 
-void modePermanentLight(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
+void modeSolidLight(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
 {
   for(int side = 0; side < NUM_SIDES; side++) 
   {
-    colorSide(side, 0, R[side], G[side], B[side]);
+    colorSideSolid(side, 0, R[side], G[side], B[side]);
   }
   
-  FastLED.show();
-  delay(2000);
+  delay(2000 / speedUpFactor);
 }
 
-void colorColumn(int px, uint8_t r, uint8_t g, uint8_t b) 
-{
-  for (int row = 0; row < NUM_ROWS; row++) 
-  {
-    setColor(px, r, g, b);
-    px += LEDS_PER_ROUND;
-  }
-}
-
-void modeRotatingLight(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
+void modeSolidLightRotating(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
 {
   // color sides
   for(int side = 0; side < NUM_SIDES; side++) 
   {
-    colorSide(side, rotationOffset, R[side], G[side], B[side]);
+    colorSideSolid(side, rotationOffset, R[side], G[side], B[side]);
   }
 
   // color transition-LEDs
   float fadePercentage = (float)fadingStepCounter / fadingStepMax;
   for(int side = 0; side < NUM_SIDES; side++) 
   {
-    int dR = (int)round((R[(side - 1) % NUM_SIDES] - R[side]) * fadePercentage);
-    int dG = (int)round((G[(side - 1) % NUM_SIDES] - G[side]) * fadePercentage);
-    int dB = (int)round((B[(side - 1) % NUM_SIDES] - B[side]) * fadePercentage);
-    Serial.println(START_OFFSET + rotationOffset + side * LEDS_PER_ROW);
+    int dR = (int)round((R[next(side)] - R[side]) * fadePercentage);
+    int dG = (int)round((G[next(side)] - G[side]) * fadePercentage);
+    int dB = (int)round((B[next(side)] - B[side]) * fadePercentage);
     colorColumn(START_OFFSET + rotationOffset + side * LEDS_PER_ROW, R[side] + dR, G[side] + dG, B[side] + dB);
   }
-  Serial.println("");
 
   // update fading
   fadingStepCounter++;
   if (fadingStepCounter >= fadingStepMax) 
   {
     fadingStepCounter = 0;
-    rotationOffset++;
-    if (rotationOffset >= LEDS_PER_ROUND) 
-    {
-      rotationOffset = 0;
-    }
+    updateRotation();
   }
  
-  FastLED.show();
-  delay(50);
+  delay(50 / speedUpFactor);
 }
 
-void colorSide(int side, int offset, uint8_t r, uint8_t g, uint8_t b) 
+void modeColorGradient(uint8_t R[4], uint8_t G[4], uint8_t B[4])
+{
+  for (int side = 0; side < NUM_SIDES; side++) 
+  {
+    colorSideGradient(side, 0, CRGB(R[side], G[side], B[side]), CRGB(R[next(side)], G[next(side)], B[next(side)]));
+  }
+  
+  delay(2000 / speedUpFactor);
+}
+
+void colorSideGradient(int side, int offset, CRGB fromColor, CRGB toColor)
+{
+  int startPx = START_OFFSET + side * LEDS_PER_ROW + offset;
+  for (int row = 0; row < NUM_ROWS; row++) 
+  {
+    fill_gradient_RGB(leds, startPx, fromColor, startPx + LEDS_PER_ROW, toColor);
+    startPx += LEDS_PER_ROUND;
+  }
+}
+
+void colorSideSolid(int side, int offset, uint8_t r, uint8_t g, uint8_t b) 
 {
   int startPx = offset + START_OFFSET + side * LEDS_PER_ROW;
   int endPx = startPx + LEDS_PER_ROW;
@@ -113,8 +118,27 @@ void colorSide(int side, int offset, uint8_t r, uint8_t g, uint8_t b)
   }
 }
 
+void colorColumn(int px, uint8_t r, uint8_t g, uint8_t b) 
+{
+  for (int row = 0; row < NUM_ROWS; row++) 
+  {
+    setColor(px, r, g, b);
+    px += LEDS_PER_ROUND;
+  }
+}
+
+void updateRotation() 
+{
+  rotationOffset = (rotationOffset + 1) % LEDS_PER_ROUND;
+}
+
 void setColor(int i, uint8_t r, uint8_t g, uint8_t b) 
 {
   leds[i % total_leds] = CRGB(r, g, b);
+}
+
+int next(int side) 
+{
+  return (side - 1) % NUM_SIDES;
 }
 
