@@ -14,15 +14,14 @@ FASTLED_USING_NAMESPACE
 
 #define LEDS_PER_ROUND  LEDS_PER_ROW * NUM_SIDES
 #define TOTAL_LEDS      LEDS_PER_ROW * NUM_ROWS * NUM_SIDES
-#define FRAMES_PER_SECOND  120
 
 int total_leds = LEDS_PER_ROW * NUM_ROWS * NUM_SIDES;
 CRGB leds[TOTAL_LEDS];
 
 int rotationOffset = 0;
-int fadingStepMax = 20;
+int fadingStepMax = 30;
 int fadingStepCounter = 0;
-int speedUpFactor = 0;
+int speedUpFactor = 1;
 
 void setup() 
 {
@@ -38,11 +37,24 @@ void loop()
   uint8_t G[4] = {0, 200, 0, 200};
   uint8_t B[4] = {0, 0, 200, 200};
 
-  
+  //fill_gradient_RGB(leds, 0, CRGB::Red, 20, CRGB::Blue);
+  //modeGradient(R, G, B);
+
+  // Put something visible on the LEDs
+  //static uint16_t hue16 = 0;
+  //hue16 += 9;
+  //fill_rainbow( leds, TOTAL_LEDS, 9 / 256, 3);
+
+  // set the brightness to a sine wave that moves with a beat
+  //uint8_t bright = beatsin8( 2, 60, 200);
+  //FastLED.setBrightness( bright );
+
+  delay(20);
   FastLED.show();
 }
 
-void modeSolidLight(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
+
+void modeSolid(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
 {
   for(int side = 0; side < NUM_SIDES; side++) 
   {
@@ -52,7 +64,7 @@ void modeSolidLight(uint8_t R[4], uint8_t G[4], uint8_t B[4])
   delay(2000 / speedUpFactor);
 }
 
-void modeSolidLightRotating(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
+void modeSolidRotating(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
 {
   // color sides
   for(int side = 0; side < NUM_SIDES; side++) 
@@ -81,11 +93,12 @@ void modeSolidLightRotating(uint8_t R[4], uint8_t G[4], uint8_t B[4])
   delay(50 / speedUpFactor);
 }
 
-void modeColorGradient(uint8_t R[4], uint8_t G[4], uint8_t B[4])
+void modeGradient(uint8_t R[4], uint8_t G[4], uint8_t B[4])
 {
   for (int side = 0; side < NUM_SIDES; side++) 
   {
     colorSideGradient(side, 0, CRGB(R[side], G[side], B[side]), CRGB(R[next(side)], G[next(side)], B[next(side)]));
+    //colorSideGradient(side, 0, CRGB::Red, CRGB::Blue);
   }
   
   delay(2000 / speedUpFactor);
@@ -94,11 +107,8 @@ void modeColorGradient(uint8_t R[4], uint8_t G[4], uint8_t B[4])
 void colorSideGradient(int side, int offset, CRGB fromColor, CRGB toColor)
 {
   int startPx = START_OFFSET + side * LEDS_PER_ROW + offset;
-  for (int row = 0; row < NUM_ROWS; row++) 
-  {
-    fill_gradient_RGB(leds, startPx, fromColor, startPx + LEDS_PER_ROW, toColor);
-    startPx += LEDS_PER_ROUND;
-  }
+  fill_gradient_RGB(leds, startPx, fromColor, startPx + LEDS_PER_ROW, toColor);
+  fillRemainingRows();
 }
 
 void colorSideSolid(int side, int offset, uint8_t r, uint8_t g, uint8_t b) 
@@ -106,15 +116,26 @@ void colorSideSolid(int side, int offset, uint8_t r, uint8_t g, uint8_t b)
   int startPx = offset + START_OFFSET + side * LEDS_PER_ROW;
   int endPx = startPx + LEDS_PER_ROW;
   
-  for (int row = 0; row < NUM_ROWS; row++) 
+  for (int px = startPx; px < endPx; px++) 
   {
-    for (int j = startPx; j < endPx; j++) 
-    {
-      setColor(j, r, g, b);
-    }
-    
-    startPx += LEDS_PER_ROUND;
+    leds[px % total_leds] = CRGB(r, g, b);
+  }
+  
+  fillRemainingRows();
+}
+
+void fillRemainingRows() 
+{
+  int startPx = START_OFFSET;
+  int endPx = startPx + LEDS_PER_ROUND;
+  for (int row = 1; row < NUM_ROWS; row++) 
+  {
+    startPx = endPx;
     endPx += LEDS_PER_ROUND;
+    for (int i = startPx; i < endPx; i++) 
+    {
+      leds[i % total_leds] = leds[i - LEDS_PER_ROUND];
+    }
   }
 }
 
@@ -122,19 +143,19 @@ void colorColumn(int px, uint8_t r, uint8_t g, uint8_t b)
 {
   for (int row = 0; row < NUM_ROWS; row++) 
   {
-    setColor(px, r, g, b);
+    leds[px % total_leds] = CRGB(r, g, b);
     px += LEDS_PER_ROUND;
   }
 }
 
 void updateRotation() 
 {
-  rotationOffset = (rotationOffset + 1) % LEDS_PER_ROUND;
-}
-
-void setColor(int i, uint8_t r, uint8_t g, uint8_t b) 
-{
-  leds[i % total_leds] = CRGB(r, g, b);
+  if (rotationOffset < LEDS_PER_ROUND) {
+    rotationOffset++;
+  }
+  else {
+    rotationOffset = 0;
+  }
 }
 
 int next(int side) 
