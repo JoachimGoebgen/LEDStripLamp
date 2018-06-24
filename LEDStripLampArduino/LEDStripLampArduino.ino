@@ -15,23 +15,23 @@ FASTLED_USING_NAMESPACE
 #define NUM_ROWS        3
 #define START_OFFSET    11
 
-#define LEDS_PER_ROUND  LEDS_PER_ROW * NUM_SIDES
-#define TOTAL_LEDS      LEDS_PER_ROW * NUM_ROWS * NUM_SIDES
+#define LEDS_PER_ROUND  (LEDS_PER_ROW * NUM_SIDES)
+#define TOTAL_LEDS      (LEDS_PER_ROW * NUM_ROWS * NUM_SIDES)
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
-int total_leds = LEDS_PER_ROW * NUM_ROWS * NUM_SIDES;
 CRGB leds[TOTAL_LEDS];
 
-uint8_t R[4] = {200, 0, 0, 200};
-uint8_t G[4] = {0, 200, 0, 200};
-uint8_t B[4] = {0, 0, 200, 200};
+byte R[NUM_SIDES];
+byte G[NUM_SIDES];
+byte B[NUM_SIDES];
+double SpeedUpFactor = 1;
+int LedMode = 0;
   
 int rotationOffset = 0;
 int fadingStepMax = 30;
 int fadingStepCounter = 0;
-int speedUpFactor = 1;
 
 void setup() 
 {
@@ -77,13 +77,17 @@ void connectMqtt()
     
     if (mqttClient.connect(CLIENT_NAME)) 
     {
-      mqttClient.subscribe(MQTT_TOPIC);
+      mqttClient.subscribe(MQTT_COLOR_TOPIC);
+      mqttClient.subscribe(MQTT_SETTINGS_TOPIC);
       
       Serial.println("");
-      Serial.print("MQTT connected with client-name ");
+      Serial.print("MQTT connected with client-name '");
       Serial.print(CLIENT_NAME);
-      Serial.print(" and subscribed to topic ");
-      Serial.println(MQTT_TOPIC);
+      Serial.print("' and subscribed to topic '");
+      Serial.print(MQTT_COLOR_TOPIC);
+      Serial.print("' and '");
+      Serial.println(MQTT_SETTINGS_TOPIC);
+      Serial.print("'");
     } 
     else 
     {
@@ -102,14 +106,75 @@ void connectMqtt()
   }
 }
 
+// msg format: r1 g1 b1 r2 g2 b2 ... rn gn bn
+// has to be this format, otherwise unexpected stuff will happen due to no checks existing
 void receivedMsg(char* topic, byte* msg, unsigned int length)
 {
-  Serial.print("Message received: ");
-  for (int i = 0; i < length; i++) 
+  Serial.print("Message received in topic ");
+  Serial.print(topic);
+  Serial.print(" : ");
+
+  byte digitPos = 0;
+  byte wordCount = 0;
+  byte value;
+  // split msg by spaces and convert digits inbetween to numbers
+  for (unsigned int i = 0; i <= length; i++)
   {
-    Serial.print((char)msg[i]);
+    if (i < length) { Serial.print((char)msg[i]); }
+    
+    if (i == length || msg[i] == 32) // space
+    {
+      if (digitPos == 0) { continue; } // two consecutive spaces
+      
+      value = toNumber(msg, i - digitPos, i - 1);
+
+      if (strcmp(topic, MQTT_COLOR_TOPIC) == 0)
+      {
+        receivedColor(wordCount, value);
+      }
+      else if (strcmp(topic, MQTT_SETTINGS_TOPIC) == 0)
+      {
+        receivedSettings(wordCount, value);
+      }
+      
+      digitPos = 0;
+      wordCount++;
+    }
+    else 
+    {
+      digitPos++;
+    }
   }
-  Serial.print("");
+}
+
+void receivedColor(byte wordCount, byte value) 
+{
+  switch(wordCount % 3)
+  {
+    case 0: R[wordCount / 3] = value; break;
+    case 1: G[wordCount / 3] = value; break;
+    case 2: B[wordCount / 3] = value; break; 
+  }
+}
+
+void receivedSettings(byte wordCount, byte value) 
+{
+  switch(wordCount)
+  {
+    case 0: LedMode = value; break;
+    case 1: SpeedUpFactor = value / (double)100; break;
+  }
+}
+
+byte toNumber(byte* msg, int from_incl, int to_incl)
+{
+  int count = to_incl - from_incl + 1; // number of digits
+  byte sum = 0;
+  for (int i = 0; i < count; i++)
+  {
+    sum += (msg[from_incl + i] - 48) * pow(10, count - 1 - i); // convert "char" to its represented number and sum it up depending on its place
+  }
+  return sum;
 }
 
 void loop()
@@ -119,28 +184,24 @@ void loop()
 
   mqttClient.loop();
 
-  modeSolid();
+  switch (LedMode) 
+  {
+    case 0: modeTurnOff(); break;
+    case 1: modeSolid(); break;
+    case 2: modeSolidRotating(); break;
+    case 3: modeGradient(); break;
+    case 4: modeParty(); break;
+  }
   
-  delay(20);
   FastLED.show();
 }
 
-void modeParty() 
+void modeTurnOff() 
 {
-  uint8_t blurAmount = dim8_raw( beatsin8(3, 64, 192) );       // A sinewave at 3 Hz with values ranging from 64 to 192.
-  blur1d(leds, TOTAL_LEDS, blurAmount);                        // Apply some blurring to whatever's already on the strip, which will eventually go black.
-  
-  uint8_t  i = beatsin8(  9, 0, TOTAL_LEDS);
-  uint8_t  j = beatsin8( 7, 0, TOTAL_LEDS);
-  uint8_t  k = beatsin8(  5, 0, TOTAL_LEDS);
-  
-  // The color of each point shifts over time, each at a different speed.
-  uint16_t ms = millis();  
-  leds[(i+j)/2] = CHSV( ms / 29, 200, 255);
-  leds[(j+k)/2] = CHSV( ms / 41, 200, 255);
-  leds[(k+i)/2] = CHSV( ms / 73, 200, 255);
-  leds[(k+i+j)/3] = CHSV( ms / 53, 200, 255);
-  delay(10);
+  for(int side = 0; side < NUM_SIDES; side++) 
+  {
+    colorSideSolid(side, 0, 0, 0, 0);
+  }
 }
 
 void modeSolid() 
@@ -150,7 +211,7 @@ void modeSolid()
     colorSideSolid(side, 0, R[side], G[side], B[side]);
   }
   
-  delay(2000 / speedUpFactor);
+  delay(2000 / SpeedUpFactor);
 }
 
 void modeSolidRotating() 
@@ -179,7 +240,7 @@ void modeSolidRotating()
     updateRotation();
   }
  
-  delay(50 / speedUpFactor);
+  delay(50 / SpeedUpFactor);
 }
 
 void modeGradient()
@@ -189,7 +250,25 @@ void modeGradient()
     colorSideGradient(side, 0, CRGB(R[side], G[side], B[side]), CRGB(R[next(side)], G[next(side)], B[next(side)]));
   }
   
-  delay(2000 / speedUpFactor);
+  delay(2000 / SpeedUpFactor);
+}
+
+void modeParty() 
+{
+  uint8_t blurAmount = dim8_raw( beatsin8(3, 64, 192) );       // A sinewave at 3 Hz with values ranging from 64 to 192.
+  blur1d(leds, TOTAL_LEDS, blurAmount);                        // Apply some blurring to whatever's already on the strip, which will eventually go black.
+  
+  uint8_t  i = beatsin8(9, 0, TOTAL_LEDS);
+  uint8_t  j = beatsin8(7, 0, TOTAL_LEDS);
+  uint8_t  k = beatsin8(5, 0, TOTAL_LEDS);
+  
+  // The color of each point shifts over time, each at a different speed.
+  uint16_t ms = millis();  
+  leds[(i+j)/2] = CHSV(ms / 29, 200, 255);
+  leds[(j+k)/2] = CHSV(ms / 41, 200, 255);
+  leds[(k+i)/2] = CHSV(ms / 73, 200, 255);
+  leds[(k+i+j)/3] = CHSV(ms / 53, 200, 255);
+  delay(20 / SpeedUpFactor);
 }
 
 void colorSideGradient(int side, int offset, CRGB fromColor, CRGB toColor)
@@ -206,7 +285,7 @@ void colorSideSolid(int side, int offset, uint8_t r, uint8_t g, uint8_t b)
   
   for (int px = startPx; px < endPx; px++) 
   {
-    leds[px % total_leds] = CRGB(r, g, b);
+    leds[px % TOTAL_LEDS] = CRGB(r, g, b);
   }
   
   fillRemainingRows();
@@ -222,7 +301,7 @@ void fillRemainingRows()
     endPx += LEDS_PER_ROUND;
     for (int i = startPx; i < endPx; i++) 
     {
-      leds[i % total_leds] = leds[i - LEDS_PER_ROUND];
+      leds[i % TOTAL_LEDS] = leds[i - LEDS_PER_ROUND];
     }
   }
 }
@@ -231,7 +310,7 @@ void colorColumn(int px, uint8_t r, uint8_t g, uint8_t b)
 {
   for (int row = 0; row < NUM_ROWS; row++) 
   {
-    leds[px % total_leds] = CRGB(r, g, b);
+    leds[px % TOTAL_LEDS] = CRGB(r, g, b);
     px += LEDS_PER_ROUND;
   }
 }
