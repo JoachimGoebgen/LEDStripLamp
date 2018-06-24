@@ -2,15 +2,15 @@
 Controlling a multi-sided lamp built with a WS281x-strip and a NodeMCU ESP32 Arduino via MQTT with FastLED (including rudimentary web-interface).
 
 ## Using FastLED in Arduino IDE
-	- Clone ```https://github.com/FastLED/FastLED``` into ```[ARDUINO_SKETCHBOOK_DIR]/libraries/FsatLED``` and (re-)start Arduino IDE
+Clone ```https://github.com/FastLED/FastLED``` into ```ARDUINO_SKETCHBOOK_DIR/libraries/FastLED``` and (re-)start Arduino IDE
 
 ## Using NodeMCU ESP32 Board in Arduino IDE
-For better reading the ```ESP32_DIR``` is meant as ```[ARDUINO_SKETCHBOOK_DIR]/hardware/espressif/esp32```
-	- Clone ```https://github.com/espressif/arduino-esp32``` into ```ESP32_DIR``` 
-	- Run ```git submodule update --init --recursive``` in ```ESP32_DIR```
-	- Double-click get.exe (windows) or run ```python2 get.py``` (linux) in ```ESP32_DIR/tools```
-	- (Re-)start Arduino IDE
-	- Select ```NodeMCU-32S``` under Tools -> Boards
+For better reading the ```ESP32_DIR``` is defined as ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32```
+- Clone ```https://github.com/espressif/arduino-esp32``` into ```ESP32_DIR``` 
+- Run ```git submodule update --init --recursive``` in ```ESP32_DIR```
+- Double-click get.exe (windows) or run ```python2 get.py``` (linux) in ```ESP32_DIR/tools```
+- (Re-)start Arduino IDE
+- Select ```NodeMCU-32S``` under Tools -> Boards
 
 
 ## connection_conf.h	
