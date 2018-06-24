@@ -123,8 +123,8 @@ void connectMqtt()
         Serial.print("' and subscribed to topic '");
         Serial.print(MQTT_COLOR_TOPIC);
         Serial.print("' and '");
-        Serial.println(MQTT_SETTINGS_TOPIC);
-        Serial.print("'");
+        Serial.print(MQTT_SETTINGS_TOPIC);
+        Serial.println("'");
       #endif
     } 
     else 
@@ -192,6 +192,10 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
       digitPos++;
     }
   }
+  
+  #ifdef DEBUG 
+    Serial.println("");
+  #endif
 }
 
 void receivedColor(byte wordCount, byte value) 
@@ -260,21 +264,8 @@ void modeSolidRotating()
     int dG = (int)round((G[next(side)] - G[side]) * fadePercentage);
     int dB = (int)round((B[next(side)] - B[side]) * fadePercentage);
 
-    Serial.print(R[side]);
-    Serial.print(" ");
-    Serial.print(G[side]);
-    Serial.print(" ");
-    Serial.print(B[side]);
-    Serial.println();
-    Serial.print(R[next(side)] - R[side]);
-    Serial.print(" ");
-    Serial.print(G[next(side)] - G[side]);
-    Serial.print(" ");
-    Serial.print(B[next(side)] - B[side]);
-    Serial.println();
     colorColumn(rotationOffset + LEDS_PER_ROW + side * LEDS_PER_ROW, R[side] + dR, G[side] + dG, B[side] + dB);
   }
-    Serial.println();
 
   // update fading
   fadingStepCounter++;
@@ -294,7 +285,7 @@ void modeGradient()
     colorSideGradient(side, 0, CRGB(R[side], G[side], B[side]), CRGB(R[next(side)], G[next(side)], B[next(side)]));
   }
   
-  delay(2000 / SpeedUpFactor);
+  delay(100);
 }
 
 void modeParty() 
@@ -302,16 +293,21 @@ void modeParty()
   uint8_t blurAmount = dim8_raw( beatsin8(3, 64, 192) );       // A sinewave at 3 Hz with values ranging from 64 to 192.
   blur1d(leds, TOTAL_LEDS, blurAmount);                        // Apply some blurring to whatever's already on the strip, which will eventually go black.
   
-  uint8_t  i = beatsin8(9, 0, TOTAL_LEDS);
-  uint8_t  j = beatsin8(7, 0, TOTAL_LEDS);
-  uint8_t  k = beatsin8(5, 0, TOTAL_LEDS);
+  int i = beatsin8(9, 0, TOTAL_LEDS - 1);
+  int j = beatsin8(7, 0, TOTAL_LEDS - 1);
+  int k = beatsin8(5, 0, TOTAL_LEDS - 1);
   
   // The color of each point shifts over time, each at a different speed.
   uint16_t ms = millis();  
+  Serial.println("1");
   leds[(i+j)/2] = CHSV(ms / 29, 200, 255);
+  Serial.println("2");
   leds[(j+k)/2] = CHSV(ms / 41, 200, 255);
+  Serial.println("3");
   leds[(k+i)/2] = CHSV(ms / 73, 200, 255);
+  Serial.println("4");
   leds[(k+i+j)/3] = CHSV(ms / 53, 200, 255);
+  Serial.println("5");
   delay(20 / SpeedUpFactor);
 }
 
@@ -367,7 +363,7 @@ void updateRotation()
     rotationOffset++;
   }
   else {
-    rotationOffset = 0;
+    rotationOffset = 1;
   }
 }
 
