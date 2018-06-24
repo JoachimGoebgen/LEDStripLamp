@@ -13,8 +13,8 @@ For better reading the ```ESP32_DIR``` is defined as ```ARDUINO_SKETCHBOOK_DIR/h
 - Select ```NodeMCU-32S``` under Tools -> Boards
 
 
-## connection_conf.h	
-This header-file is used as config which is listed on the .gitignore to prevent you from accidently committing sensible information like your WIFI-password.
+## Creating connection_conf.h	
+This header-file is used as config which is listed in the .gitignore to prevent you from accidently committing sensible information like your WIFI-password.
 Just create it in the ```LEDStripLampArduino```-folder and add the following lines:
 ```
 #define WIFI_SSID 		"your wifi name"
@@ -27,11 +27,11 @@ Just create it in the ```LEDStripLampArduino```-folder and add the following lin
 
 # Troubleshooting
 
-## How do I install the NodeMCU ESP32 Board?!
-If the short guide further up is not enough, see (espressif repo)[https://github.com/espressif/arduino-esp32] for more information on the installation process.
+## How do I use the NodeMCU ESP32 Board?!
+If the short guide further up is not enough, see the [espressif repo](https://github.com/espressif/arduino-esp32) for more information on the installation process.
 
 ## Espressifs Wifi.h is colliding with Arduinos Wifi.h when compiling?!
-It is important to name the ESP32_DIR ```esp32``` and not ```arduino-esp32``` as it will be named automatically. See (this thread)[https://github.com/espressif/arduino-esp32/issues/20] for further information.
+It is important to name the ESP32_DIR ```esp32``` and not ```arduino-esp32``` as it will be named automatically. See [this thread](https://github.com/espressif/arduino-esp32/issues/20) for further information.
 
 ## My LED-Strip is flickering?!
-See (this thread)[https://github.com/FastLED/FastLED/issues/306] for problem with flickering LEDs.
+See [this thread](https://github.com/FastLED/FastLED/issues/306) for problem with flickering LEDs.
