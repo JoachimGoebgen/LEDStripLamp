@@ -1,6 +1,7 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
 #include "FastLED.h"
-#include "wificonf.h"
+#include "WiFi.h"
+#include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT, MQTT_TOPIC
 
 FASTLED_USING_NAMESPACE
 
@@ -26,9 +27,25 @@ int speedUpFactor = 1;
 
 void setup() 
 {
-  delay(3000); // 3 second delay for recovery
+  delay(3000);
   Serial.begin(9600);
 
+  // WIFI init
+  Serial.println("");
+  Serial.print("Connecting to ");
+  Serial.println(WIFI_SSID);
+
+  WiFi.begin(WIFI_SSID, WIFI_KEY);
+
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.print("WiFi connected. IP address: ");
+  Serial.println(WiFi.localIP());
+  
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, TOTAL_LEDS).setCorrection(TypicalLEDStrip);
 }
 
