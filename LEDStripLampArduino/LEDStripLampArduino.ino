@@ -28,7 +28,7 @@ byte R[NUM_SIDES];
 byte G[NUM_SIDES];
 byte B[NUM_SIDES];
 double SpeedUpFactor = 1;
-int LedMode = 0;
+int LedMode = 2;
 
 // 
 int rotationOffset = 0;
@@ -166,7 +166,7 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
   for (unsigned int i = 0; i <= length; i++)
   {
     #ifdef DEBUG 
-    if (i < length) { Serial.print((char)msg[i]); }
+      if (i < length) { Serial.print((char)msg[i]); }
     #endif
     
     if (i == length || msg[i] == 32) // space
@@ -253,14 +253,28 @@ void modeSolidRotating()
   }
 
   // color transition-LEDs
-  float fadePercentage = (float)fadingStepCounter / fadingStepMax;
+  float fadePercentage = 1 - (float)fadingStepCounter / fadingStepMax;
   for(int side = 0; side < NUM_SIDES; side++) 
   {
     int dR = (int)round((R[next(side)] - R[side]) * fadePercentage);
     int dG = (int)round((G[next(side)] - G[side]) * fadePercentage);
     int dB = (int)round((B[next(side)] - B[side]) * fadePercentage);
-    colorColumn(START_OFFSET + rotationOffset + side * LEDS_PER_ROW, R[side] + dR, G[side] + dG, B[side] + dB);
+
+    Serial.print(R[side]);
+    Serial.print(" ");
+    Serial.print(G[side]);
+    Serial.print(" ");
+    Serial.print(B[side]);
+    Serial.println();
+    Serial.print(R[next(side)] - R[side]);
+    Serial.print(" ");
+    Serial.print(G[next(side)] - G[side]);
+    Serial.print(" ");
+    Serial.print(B[next(side)] - B[side]);
+    Serial.println();
+    colorColumn(rotationOffset + LEDS_PER_ROW + side * LEDS_PER_ROW, R[side] + dR, G[side] + dG, B[side] + dB);
   }
+    Serial.println();
 
   // update fading
   fadingStepCounter++;
@@ -312,12 +326,12 @@ void colorSideGradient(int side, int offset, CRGB fromColor, CRGB toColor)
 
 void colorSideSolid(int side, int offset, uint8_t r, uint8_t g, uint8_t b) 
 {
-  int startPx = offset + START_OFFSET + side * LEDS_PER_ROW;
+  int startPx = offset + side * LEDS_PER_ROW;
   int endPx = startPx + LEDS_PER_ROW;
   
   for (int px = startPx; px < endPx; px++) 
   {
-    leds[px % TOTAL_LEDS] = CRGB(r, g, b);
+    leds[px % LEDS_PER_ROUND + START_OFFSET] = CRGB(r, g, b);
   }
   
   fillRemainingRows();
@@ -342,7 +356,7 @@ void colorColumn(int px, uint8_t r, uint8_t g, uint8_t b)
 {
   for (int row = 0; row < NUM_ROWS; row++) 
   {
-    leds[px % TOTAL_LEDS] = CRGB(r, g, b);
+    leds[(px + START_OFFSET) % TOTAL_LEDS] = CRGB(r, g, b);
     px += LEDS_PER_ROUND;
   }
 }
@@ -359,6 +373,6 @@ void updateRotation()
 
 int next(int side) 
 {
-  return (side - 1) % NUM_SIDES;
+  return (side + 1) % NUM_SIDES;
 }
 
