@@ -1,5 +1,6 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
 #include "FastLED.h"
+#include "wificonf.h"
 
 FASTLED_USING_NAMESPACE
 
