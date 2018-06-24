@@ -1,6 +1,7 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
 #include "FastLED.h"
 #include "WiFi.h"
+#include "PubSubClient.h"
 #include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT, MQTT_TOPIC
 
 FASTLED_USING_NAMESPACE
@@ -17,9 +18,16 @@ FASTLED_USING_NAMESPACE
 #define LEDS_PER_ROUND  LEDS_PER_ROW * NUM_SIDES
 #define TOTAL_LEDS      LEDS_PER_ROW * NUM_ROWS * NUM_SIDES
 
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+
 int total_leds = LEDS_PER_ROW * NUM_ROWS * NUM_SIDES;
 CRGB leds[TOTAL_LEDS];
 
+uint8_t R[4] = {200, 0, 0, 200};
+uint8_t G[4] = {0, 200, 0, 200};
+uint8_t B[4] = {0, 0, 200, 200};
+  
 int rotationOffset = 0;
 int fadingStepMax = 30;
 int fadingStepCounter = 0;
@@ -30,43 +38,89 @@ void setup()
   delay(3000);
   Serial.begin(9600);
 
-  // WIFI init
+  connectWifi();
+  
+  mqttClient.setServer(MQTT_SRV_IP, (uint16_t)MQTT_SRV_PORT);
+  mqttClient.setCallback(receivedMsg);
+  connectMqtt();
+  
+  FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, TOTAL_LEDS).setCorrection(TypicalLEDStrip);
+}
+
+void connectWifi() 
+{
   Serial.println("");
-  Serial.print("Connecting to ");
+  Serial.print("Connecting to WiFi named ");
   Serial.println(WIFI_SSID);
 
   WiFi.begin(WIFI_SSID, WIFI_KEY);
+  WiFi.setHostname(CLIENT_NAME);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED) 
+  {
       delay(500);
       Serial.print(".");
   }
 
   Serial.println("");
-  Serial.print("WiFi connected. IP address: ");
+  Serial.print("WiFi connected with IP address ");
   Serial.println(WiFi.localIP());
-  
-  FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, TOTAL_LEDS).setCorrection(TypicalLEDStrip);
+}
+
+void connectMqtt() 
+{
+  while (!mqttClient.connected()) 
+  {
+    Serial.println("");
+    Serial.print("Connecting to MQTT Server on ");
+    Serial.print(MQTT_SRV_IP);
+    
+    if (mqttClient.connect(CLIENT_NAME)) 
+    {
+      mqttClient.subscribe(MQTT_TOPIC);
+      
+      Serial.println("");
+      Serial.print("MQTT connected with client-name ");
+      Serial.print(CLIENT_NAME);
+      Serial.print(" and subscribed to topic ");
+      Serial.println(MQTT_TOPIC);
+    } 
+    else 
+    {
+      Serial.println("");
+      Serial.print("MQTT connection FAILED with status-code ");
+      Serial.print(mqttClient.state());
+      Serial.print(". Trying again in ");
+      
+      for (int i = 5; i > 0; i--)
+      {
+        Serial.print(i);
+        Serial.print(" ");
+        delay(1000);
+      }
+    }
+  }
+}
+
+void receivedMsg(char* topic, byte* msg, unsigned int length)
+{
+  Serial.print("Message received: ");
+  for (int i = 0; i < length; i++) 
+  {
+    Serial.print((char)msg[i]);
+  }
+  Serial.print("");
 }
 
 void loop()
 {
-  uint8_t R[4] = {200, 0, 0, 200};
-  uint8_t G[4] = {0, 200, 0, 200};
-  uint8_t B[4] = {0, 0, 200, 200};
+  if (WiFi.status() != WL_CONNECTED) { connectWifi(); }
+  if (!mqttClient.connected()) { connectMqtt(); }
 
-  //fill_gradient_RGB(leds, 0, CRGB::Red, 20, CRGB::Blue);
-  //modeGradient(R, G, B);
+  mqttClient.loop();
 
-  // Put something visible on the LEDs
-  //static uint16_t hue16 = 0;
-  //hue16 += 9;
-  //fill_rainbow( leds, TOTAL_LEDS, 9 / 256, 3);
-
-  // set the brightness to a sine wave that moves with a beat
-  //uint8_t bright = beatsin8( 2, 60, 200);
-  //FastLED.setBrightness( bright );
-
+  modeSolid();
+  
   delay(20);
   FastLED.show();
 }
@@ -89,7 +143,7 @@ void modeParty()
   delay(10);
 }
 
-void modeSolid(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
+void modeSolid() 
 {
   for(int side = 0; side < NUM_SIDES; side++) 
   {
@@ -99,7 +153,7 @@ void modeSolid(uint8_t R[4], uint8_t G[4], uint8_t B[4])
   delay(2000 / speedUpFactor);
 }
 
-void modeSolidRotating(uint8_t R[4], uint8_t G[4], uint8_t B[4]) 
+void modeSolidRotating() 
 {
   // color sides
   for(int side = 0; side < NUM_SIDES; side++) 
@@ -128,12 +182,11 @@ void modeSolidRotating(uint8_t R[4], uint8_t G[4], uint8_t B[4])
   delay(50 / speedUpFactor);
 }
 
-void modeGradient(uint8_t R[4], uint8_t G[4], uint8_t B[4])
+void modeGradient()
 {
   for (int side = 0; side < NUM_SIDES; side++) 
   {
     colorSideGradient(side, 0, CRGB(R[side], G[side], B[side]), CRGB(R[next(side)], G[next(side)], B[next(side)]));
-    //colorSideGradient(side, 0, CRGB::Red, CRGB::Blue);
   }
   
   delay(2000 / speedUpFactor);
