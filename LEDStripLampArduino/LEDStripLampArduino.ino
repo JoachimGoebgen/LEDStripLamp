@@ -23,20 +23,26 @@ PubSubClient mqttClient(wifiClient);
 
 CRGB leds[TOTAL_LEDS];
 
+// 
 byte R[NUM_SIDES];
 byte G[NUM_SIDES];
 byte B[NUM_SIDES];
 double SpeedUpFactor = 1;
 int LedMode = 0;
-  
+
+// 
 int rotationOffset = 0;
 int fadingStepMax = 30;
 int fadingStepCounter = 0;
+bool doUpdate = true;
 
 void setup() 
 {
-  delay(3000);
-  Serial.begin(9600);
+  delay(1000);
+
+  #ifdef DEBUG 
+    Serial.begin(9600); 
+  #endif
 
   connectWifi();
   
@@ -47,59 +53,96 @@ void setup()
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, TOTAL_LEDS).setCorrection(TypicalLEDStrip);
 }
 
+void loop()
+{
+  if (WiFi.status() != WL_CONNECTED) { connectWifi(); }
+  if (!mqttClient.connected()) { connectMqtt(); }
+
+  mqttClient.loop();
+
+  switch (LedMode) 
+  {
+    case 0: modeTurnOff(); break;
+    case 1: modeSolid(); break;
+    case 2: modeSolidRotating(); break;
+    case 3: modeGradient(); break;
+    case 4: modeParty(); break;
+  }
+  
+  FastLED.show();
+}
+
+// --------------------------------- NETWORK ---------------------------------
+
 void connectWifi() 
 {
-  Serial.println("");
-  Serial.print("Connecting to WiFi named ");
-  Serial.println(WIFI_SSID);
+  #ifdef DEBUG
+    Serial.println("");
+    Serial.print("Connecting to WiFi named ");
+    Serial.println(WIFI_SSID);
+  #endif
 
   WiFi.begin(WIFI_SSID, WIFI_KEY);
   WiFi.setHostname(CLIENT_NAME);
 
   while (WiFi.status() != WL_CONNECTED) 
   {
+      #ifdef DEBUG 
+        Serial.print("."); 
+      #endif
+      
       delay(500);
-      Serial.print(".");
   }
 
-  Serial.println("");
-  Serial.print("WiFi connected with IP address ");
-  Serial.println(WiFi.localIP());
+  #ifdef DEBUG 
+    Serial.println("");
+    Serial.print("WiFi connected with IP address ");
+    Serial.println(WiFi.localIP());
+  #endif
 }
 
 void connectMqtt() 
 {
   while (!mqttClient.connected()) 
   {
-    Serial.println("");
-    Serial.print("Connecting to MQTT Server on ");
-    Serial.print(MQTT_SRV_IP);
+    #ifdef DEBUG 
+      Serial.println("");
+      Serial.print("Connecting to MQTT Server on ");
+      Serial.print(MQTT_SRV_IP);
+    #endif
     
     if (mqttClient.connect(CLIENT_NAME)) 
     {
       mqttClient.subscribe(MQTT_COLOR_TOPIC);
       mqttClient.subscribe(MQTT_SETTINGS_TOPIC);
-      
-      Serial.println("");
-      Serial.print("MQTT connected with client-name '");
-      Serial.print(CLIENT_NAME);
-      Serial.print("' and subscribed to topic '");
-      Serial.print(MQTT_COLOR_TOPIC);
-      Serial.print("' and '");
-      Serial.println(MQTT_SETTINGS_TOPIC);
-      Serial.print("'");
+
+      #ifdef DEBUG 
+        Serial.println("");
+        Serial.print("MQTT connected with client-name '");
+        Serial.print(CLIENT_NAME);
+        Serial.print("' and subscribed to topic '");
+        Serial.print(MQTT_COLOR_TOPIC);
+        Serial.print("' and '");
+        Serial.println(MQTT_SETTINGS_TOPIC);
+        Serial.print("'");
+      #endif
     } 
     else 
     {
-      Serial.println("");
-      Serial.print("MQTT connection FAILED with status-code ");
-      Serial.print(mqttClient.state());
-      Serial.print(". Trying again in ");
+      #ifdef DEBUG 
+        Serial.println("");
+        Serial.print("MQTT connection FAILED with status-code ");
+        Serial.print(mqttClient.state());
+        Serial.print(". Trying again in ");
+      #endif
       
       for (int i = 5; i > 0; i--)
       {
-        Serial.print(i);
-        Serial.print(" ");
+        #ifdef DEBUG 
+          Serial.print(i);
+          Serial.print(" ");
+        #endif
+        
         delay(1000);
       }
     }
@@ -110,17 +153,21 @@ void connectMqtt()
 // has to be this format, otherwise unexpected stuff will happen due to no checks existing
 void receivedMsg(char* topic, byte* msg, unsigned int length)
 {
-  Serial.print("Message received in topic ");
-  Serial.print(topic);
-  Serial.print(" : ");
-
+  #ifdef DEBUG 
+    Serial.print("Message received in topic ");
+    Serial.print(topic);
+    Serial.print(" : ");
+  #endif
+  
   byte digitPos = 0;
   byte wordCount = 0;
   byte value;
   // split msg by spaces and convert digits inbetween to numbers
   for (unsigned int i = 0; i <= length; i++)
   {
+    #ifdef DEBUG 
     if (i < length) { Serial.print((char)msg[i]); }
+    #endif
     
     if (i == length || msg[i] == 32) // space
     {
@@ -177,24 +224,7 @@ byte toNumber(byte* msg, int from_incl, int to_incl)
   return sum;
 }
 
-void loop()
-{
-  if (WiFi.status() != WL_CONNECTED) { connectWifi(); }
-  if (!mqttClient.connected()) { connectMqtt(); }
-
-  mqttClient.loop();
-
-  switch (LedMode) 
-  {
-    case 0: modeTurnOff(); break;
-    case 1: modeSolid(); break;
-    case 2: modeSolidRotating(); break;
-    case 3: modeGradient(); break;
-    case 4: modeParty(); break;
-  }
-  
-  FastLED.show();
-}
+// --------------------------------- MODES ---------------------------------
 
 void modeTurnOff() 
 {
@@ -211,7 +241,7 @@ void modeSolid()
     colorSideSolid(side, 0, R[side], G[side], B[side]);
   }
   
-  delay(2000 / SpeedUpFactor);
+  delay(100);
 }
 
 void modeSolidRotating() 
@@ -270,6 +300,8 @@ void modeParty()
   leds[(k+i+j)/3] = CHSV(ms / 53, 200, 255);
   delay(20 / SpeedUpFactor);
 }
+
+// --------------------------------- COLORING ---------------------------------
 
 void colorSideGradient(int side, int offset, CRGB fromColor, CRGB toColor)
 {
