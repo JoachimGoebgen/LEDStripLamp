@@ -1,0 +1,21 @@
+#page-wrap {
+     width: 800px;
+     margin: 0 auto;
+}
+
+.btnHor {
+    border: none;
+    width: 250px;
+    height: 11px;
+}
+
+.btnVer {
+    border: none;
+    width: 11px;
+    height: 250px;
+}
+
+tr {
+    font-size: 0;
+    margin: 0;
+}
