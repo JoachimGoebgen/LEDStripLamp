@@ -32,13 +32,17 @@ mqttClient.on('connect', () => {
 });
 
 mqttClient.on('message', (topic, message) => {
+	var msgStr = message.toString();
 	if (topic === MQTT_COLOR_TOPIC) {
-		colors = message.toString().split(" ");
+		colors = msgStr.split(" ");
 	} else if (topic === MQTT_SETTINGS_TOPIC) {
-		settings = message.toString().split(" ");
+		settings = msgStr.split(" ");
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) {
+		var rgb;
+		if (msgStr.startsWith("#")) { rgb = hexToRgb(msgStr); } // f.e. "#f34ff4"
+		else { rgb = cleanEmptyEntries(msgStr.split(" ")); } // f.e. "255 40 0"
+		
 		side = topic.substring(topic.length - 1, topic.length);
-		var rgb = cleanEmptyEntries(message.toString().split(" "));
 		colors[side*3] = rgb[0];
 		colors[side*3+1] = rgb[1];
 		colors[side*3+2] = rgb[2];
@@ -136,6 +140,22 @@ function cleanEmptyEntries(arr) {
   }
   return arr;
 };
+
+// see https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
+function hexToRgb(hex) {
+    // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+    var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+        return r + r + g + g + b + b;
+    });
+
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
 
 
 app.listen(3003);
