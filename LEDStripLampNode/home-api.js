@@ -52,6 +52,8 @@ app.get('/presets', function (req, res) {
 
 app.post('/colors', function (req, res) {
         colors = req.body['colorArr[]'];
+	console.log(req.body);
+	console.log(colors);
         mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
         res.status(200).send(colors);
 });
