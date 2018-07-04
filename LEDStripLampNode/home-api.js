@@ -28,27 +28,22 @@ mqttClient.on('connect', () => {
 	
 	for (i = 0; i < 4; i++) {
 		mqttClient.subscribe(MQTT_COLOR_TOPIC.concat(i));
-		//console.log(MQTT_COLOR_TOPIC.concat(i));
 	}
 });
 
 mqttClient.on('message', (topic, message) => {
 	if (topic === MQTT_COLOR_TOPIC) {
-		led = message.toString().split(" ");
+		colors = message.toString().split(" ");
 	} else if (topic === MQTT_SETTINGS_TOPIC) {
 		settings = message.toString().split(" ");
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) {
-		side = MQTT_COLOR_TOPIC.substring(MQTT_COLOR_TOPIC.length - 1, MQTT_COLOR_TOPIC.length);
-		//console.log(side);
+		side = topic.substring(topic.length - 1, topic.length);
 		var rgb = cleanEmptyEntries(message.toString().split(" "));
 		colors[side*3] = rgb[0];
 		colors[side*3+1] = rgb[1];
 		colors[side*3+2] = rgb[2];
 		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
-		//console.log(colors);
 	}
-
-	//console.log(message);
 });
 
 
