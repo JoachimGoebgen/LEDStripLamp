@@ -25,6 +25,11 @@ initConfig();
 mqttClient.on('connect', () => {
 	mqttClient.subscribe(MQTT_COLOR_TOPIC)
 	mqttClient.subscribe(MQTT_SETTINGS_TOPIC)
+	
+	for (i = 0; i < 4; i++) {
+		mqttClient.subscribe(MQTT_COLOR_TOPIC.concat(i));
+		//console.log(MQTT_COLOR_TOPIC.concat(i));
+	}
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -32,6 +37,15 @@ mqttClient.on('message', (topic, message) => {
 		led = message.toString().split(" ");
 	} else if (topic === MQTT_SETTINGS_TOPIC) {
 		settings = message.toString().split(" ");
+	} else if (topic.includes(MQTT_COLOR_TOPIC)) {
+		side = MQTT_COLOR_TOPIC.substring(MQTT_COLOR_TOPIC.length - 1, MQTT_COLOR_TOPIC.length);
+		//console.log(side);
+		var rgb = cleanEmptyEntries(message.toString().split(" "));
+		colors[side*3] = rgb[0];
+		colors[side*3+1] = rgb[1];
+		colors[side*3+2] = rgb[2];
+		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
+		//console.log(colors);
 	}
 
 	//console.log(message);
@@ -109,9 +123,9 @@ function savePresetsToFile() {
 
 function parsePresetFromString(str) {
 	var strSplit = str.split(",");
-        var newMode = new Array(3);
-        newMode[0] = strSplit[0];
-        newMode[1] = cleanEmptyEntries(strSplit[1].split(" "));
+    var newMode = new Array(3);
+    newMode[0] = strSplit[0];
+    newMode[1] = cleanEmptyEntries(strSplit[1].split(" "));
 	newMode[2] = cleanEmptyEntries(strSplit[2].split(" "));
 	return newMode;
 };
