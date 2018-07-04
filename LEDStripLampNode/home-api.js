@@ -39,13 +39,15 @@ mqttClient.on('message', (topic, message) => {
 		settings = msgStr.split(" ");
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) {
 		var rgb;
+		console.log(msgStr);
 		if (msgStr.startsWith("#")) { rgb = hexToRgb(msgStr); } // f.e. "#f34ff4"
 		else { rgb = cleanEmptyEntries(msgStr.split(" ")); } // f.e. "255 40 0"
-		
+		console.log(rgb);
 		side = topic.substring(topic.length - 1, topic.length);
 		colors[side*3] = rgb[0];
 		colors[side*3+1] = rgb[1];
 		colors[side*3+2] = rgb[2];
+		console.log(colors);
 		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
 	}
 });
@@ -150,11 +152,11 @@ function hexToRgb(hex) {
     });
 
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-    } : null;
+    return result ? new Array(
+		parseInt(result[1], 16), 
+		parseInt(result[2], 16), 
+		parseInt(result[3], 16)
+    ) : null;
 }
 
 
