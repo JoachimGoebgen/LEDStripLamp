@@ -1,6 +1,6 @@
 #include <ESP8266WiFi.h>
 #include "PubSubClient.h"
-#include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT, MQTT_TOPIC
+#include "../connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT, MQTT_TOPIC
 #include <Keypad.h>
 
 WiFiClient wifiClient;
