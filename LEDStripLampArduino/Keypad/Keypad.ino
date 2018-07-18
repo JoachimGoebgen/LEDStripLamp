@@ -11,7 +11,7 @@ PubSubClient mqttClient(wifiClient);
 // Therefore just exchange row- and column-definitions in keys-array
 const byte rows = 4; // nunmber of rows
 const byte cols = 4; // number of columns
-byte rowPins[rows] = {D3, D4, D2, D1}; //connect to the row pinouts of the keypad
+byte rowPins[rows] = {D4, D3, D2, D1}; //connect to the row pinouts of the keypad
 byte colPins[cols] = {D8, D7, D6, D5}; //connect to the column pinouts of the keypad
 char keys[rows][cols] = {
   {'1','4','7','*'},
@@ -32,8 +32,6 @@ void setup() {
   
   mqttClient.setServer(MQTT_SRV_IP, (uint16_t)MQTT_SRV_PORT);
   connectMqtt();
-  
-  //keypad.addEventListener(keypadEvent); // Add an event listener for this keypad
 }
 
 void loop() {
@@ -44,7 +42,28 @@ void loop() {
   
   char key = keypad.getKey();
   if (key != NO_KEY){
-    Serial.println(key);
+    #ifdef DEBUG 
+      Serial.println(key); 
+    #endif
+    
+    if (key == '0') {                                   // --- 0:
+      mqttClient.publish(MQTT_SETTINGS_TOPIC, &key);    // [turn off] 0 is not used to publish preset but to turn off LED
+    } else if (isDigit(key)) {                          // --- 1/2/3...:
+      mqttClient.publish(MQTT_LOADPRESET_TOPIC, &key);  // [change preset] just publish digit (1, 2, ...) 
+      key = '1';                                        // and
+      mqttClient.publish(MQTT_SETTINGS_TOPIC, &key);    // [change mode] presets are always with mode 1
+    } else if (isAlpha(key)) {                          // --- A/B/C/D:
+      key -= 16;                                        // A/B/C/D to 1/2/3/4
+      mqttClient.publish(MQTT_SETTINGS_TOPIC, &key);    // [change mode] 1=solid, 2=rotating, 3=gradient, 4=party 
+    } else {
+      if (key == '*') {
+        key = '-';
+        mqttClient.publish(MQTT_BRIGHTNESS_TOPIC, &key); // [dec brightness] send '-'
+      } else { // key == '#'
+        key = '+';
+        mqttClient.publish(MQTT_BRIGHTNESS_TOPIC, &key); // [inc brightness] send '+'
+      }
+    }
   }
 
 }
@@ -95,7 +114,7 @@ void connectMqtt()
         Serial.print("MQTT connected with client-name '");
         Serial.print(CLIENT_NAME);
         Serial.print("' and will be publishing to topic '");
-        Serial.print(MQTT_COLOR_TOPIC);
+        Serial.print(MQTT_LOADPRESET_TOPIC);
         Serial.print("' and '");
         Serial.print(MQTT_SETTINGS_TOPIC);
         Serial.println("'");
