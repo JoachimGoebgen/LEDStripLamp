@@ -6,7 +6,7 @@ var colors = new Array(12);
 var presets = new Array(0);
 
 var CONF_FILE_PATH = '../connection_conf.h';
-var PRESET_FILE_PATH = '../saved_modes';
+var PRESET_FILE_PATH = '../presets';
 var MQTT_COLOR_TOPIC;
 var MQTT_SETTINGS_TOPIC;
 var MQTT_BRIGHTNESS_TOPIC;
@@ -84,8 +84,7 @@ function initConfig() {
 	MQTT_COLOR_TOPIC = data.substring(data.search("MQTT_COLOR_TOPIC")+16).split("\"")[1];
 	MQTT_SETTINGS_TOPIC = data.substring(data.search("MQTT_SETTINGS_TOPIC")+19).split("\"")[1];
 	MQTT_BRIGHTNESS_TOPIC = data.substring(data.search("MQTT_BRIGHTNESS_TOPIC")+21).split("\"")[1];
-	MQTT_LOADPRESET_TOPIC = data.substring(data.search("MQTT_LOADPRESET_TOPIC")+21).split("\"")[1];
-	MQTT_SAVEPRESET_TOPIC = data.substring(data.search("MQTT_SAVEPRESET_TOPIC")+21).split("\"")[1];
+	MQTT_PRESET_TOPIC = data.substring(data.search("MQTT_PRESET_TOPIC")+17).split("\"")[1];
 	var port = data.substring(data.search("MQTT_SRV_PORT")+13).split(/\s+/)[1];
 	MQTT_SRV = "mqtt://".concat(data.substring(data.search("MQTT_SRV_IP")+11).split("\"")[1]).concat(":").concat(port);
 
