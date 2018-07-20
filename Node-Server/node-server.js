@@ -10,8 +10,7 @@ var PRESET_FILE_PATH = '../saved_modes';
 var MQTT_COLOR_TOPIC;
 var MQTT_SETTINGS_TOPIC;
 var MQTT_BRIGHTNESS_TOPIC;
-var MQTT_LOADPRESET_TOPIC;
-var MQTT_SAVEPRESET_TOPIC;
+var MQTT_PRESET_TOPIC;
 var MQTT_SRV;
 var mqttClient;
 
@@ -20,6 +19,8 @@ initConfig();
 mqttClient.on('connect', () => {
 	mqttClient.subscribe(MQTT_COLOR_TOPIC)
 	mqttClient.subscribe(MQTT_SETTINGS_TOPIC)
+	mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC)
+	mqttClient.subscribe(MQTT_PRESET_TOPIC)
 	
 	for (i = 0; i < 4; i++) {
 		mqttClient.subscribe(MQTT_COLOR_TOPIC.concat(i));
@@ -28,11 +29,17 @@ mqttClient.on('connect', () => {
 
 mqttClient.on('message', (topic, message) => {
 	var msgStr = message.toString();
-	if (topic === MQTT_COLOR_TOPIC) {
+	
+	// normal color update 
+	if (topic === MQTT_COLOR_TOPIC) { 
 		colors = msgStr.split(" ");
-	} else if (topic === MQTT_SETTINGS_TOPIC) {
+		
+	// mode and speed update
+	} else if (topic === MQTT_SETTINGS_TOPIC) { 
 		settings = msgStr.split(" ");
-	} else if (topic.includes(MQTT_COLOR_TOPIC)) {
+	
+	// update a single side and re-publish with whole colors-array
+	} else if (topic.includes(MQTT_COLOR_TOPIC)) { 
 		var rgb;
 		if (msgStr.startsWith("#")) { 
 			rgb = hexToRgb(msgStr); // f.e. "#f34ff4"
@@ -48,10 +55,27 @@ mqttClient.on('message', (topic, message) => {
 		
 		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
 		
-		console.log(msgStr);
-		console.log(rgb);
-		console.log(colors);
+	// either load preset or save current state as preset
+	} else if (topic === MQTT_PRESET_TOPIC) { 
+		var strSplit = cleanEmptyEntries(msgStr.split(" "));
+		if (strSplit.length > 1 && strSplit[0] === "save") {
+			var id = strSplit[1];
+			var name; // optional
+			if (strSplit.length == 3) { name = strSplit[3]; } else { name = ""; }
+			presets.push(createNewPreset(id, name));
+			savePresetsToFile();
+			
+		} else if (strSplit.length == 1) {
+			for (i = 0; i < presets.length; i++) {
+				if (presets[i][0][0] === strSplit[0] || presets[i][0][1] === strSplit[0]) { // if mqtt-string equals either id or name, publish the saved preset
+					mqttClient.publish(MQTT_COLOR_TOPIC, presets[i][1].join(" "));
+					mqttClient.publish(MQTT_SETTINGS_TOPIC, presets[i][2].join(" "));
+				}
+			}
+		}
 	}
+	
+	//console.log(msgStr);
 });
 
 function initConfig() {
@@ -59,15 +83,13 @@ function initConfig() {
 
 	MQTT_COLOR_TOPIC = data.substring(data.search("MQTT_COLOR_TOPIC")+16).split("\"")[1];
 	MQTT_SETTINGS_TOPIC = data.substring(data.search("MQTT_SETTINGS_TOPIC")+19).split("\"")[1];
-	MQTT_SAVE_TOPIC = MQTT_COLOR_TOPIC.concat("/save");
+	MQTT_BRIGHTNESS_TOPIC = data.substring(data.search("MQTT_BRIGHTNESS_TOPIC")+21).split("\"")[1];
+	MQTT_LOADPRESET_TOPIC = data.substring(data.search("MQTT_LOADPRESET_TOPIC")+21).split("\"")[1];
+	MQTT_SAVEPRESET_TOPIC = data.substring(data.search("MQTT_SAVEPRESET_TOPIC")+21).split("\"")[1];
 	var port = data.substring(data.search("MQTT_SRV_PORT")+13).split(/\s+/)[1];
 	MQTT_SRV = "mqtt://".concat(data.substring(data.search("MQTT_SRV_IP")+11).split("\"")[1]).concat(":").concat(port);
 
 	mqttClient = mqtt.connect(MQTT_SRV);
-	//console.log(MQTT_SRV);
-	//console.log(MQTT_COLOR_TOPIC);
-	//console.log(MQTT_SETTINGS_TOPIC);
-	//console.log(MQTT_SAVE_TOPIC);
 
 	// read presets from file
 	var lines = cleanEmptyEntries(String(fs.readFileSync(PRESET_FILE_PATH)).split(/\n/));
@@ -79,11 +101,20 @@ function initConfig() {
 	//console.log(presets);
 };
 
+function createNewPreset(id, name) {
+	var newPreset = new Array(3);
+	newPreset[0] = [id, name];
+	newPreset[1] = colors.slice();
+	newPreset[0] = settings.slice();
+	return newPreset;
+}
+
+// format: ID name, r1 g1 b1 r2 g2 b2 r3 g3 b3 r4 g4 b4, mode speed
 function savePresetsToFile() {
 	var lines = new Array(presets.length);
 	for (i = 0; i < presets.length; i++) {
 		var temp = new Array(3);
-		temp[0] = presets[i][0];
+		temp[0] = presets[i][0].join(" ");
 		temp[1] = presets[i][1].join(" ");
 		temp[2] = presets[i][2].join(" ");
 		lines[i] = temp.join(", ");
@@ -94,11 +125,11 @@ function savePresetsToFile() {
 
 function parsePresetFromString(str) {
 	var strSplit = str.split(",");
-	var newMode = new Array(3);
-	newMode[0] = strSplit[0];
-	newMode[1] = cleanEmptyEntries(strSplit[1].split(" "));
-	newMode[2] = cleanEmptyEntries(strSplit[2].split(" "));
-	return newMode;
+	var newPreset = new Array(3);
+	newPreset[0] = cleanEmptyEntries(strSplit[0].split(" "));
+	newPreset[1] = cleanEmptyEntries(strSplit[1].split(" "));
+	newPreset[2] = cleanEmptyEntries(strSplit[2].split(" "));
+	return newPreset;
 };
 
 function cleanEmptyEntries(arr) {
