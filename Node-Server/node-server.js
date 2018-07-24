@@ -58,14 +58,24 @@ mqttClient.on('message', (topic, message) => {
 	// either load preset or save current state as preset
 	} else if (topic === MQTT_PRESET_TOPIC) { 
 		var strSplit = cleanEmptyEntries(msgStr.split(" "));
-		if (strSplit.length > 1 && strSplit[0] === "save") {
+		if (strSplit.length > 1 && strSplit[0] === "save") { // save
 			var id = strSplit[1];
 			var name; // optional
 			if (strSplit.length == 3) { name = strSplit[3]; } else { name = ""; }
-			presets.push(createNewPreset(id, name));
+			var newPreset = createNewPreset(id, name);
+			bool idExists = false;
+			for (i = 0; i < presets.length; i++) {
+				if (presets[i][0][0] === id) {
+					presets[i] = newPreset;
+					idExists = true;
+				}
+			}
+			if (idExists == false) {
+				presets.push(createNewPreset(id, name));
+			}
 			savePresetsToFile();
 			
-		} else if (strSplit.length == 1) {
+		} else if (strSplit.length == 1) { // load
 			for (i = 0; i < presets.length; i++) {
 				if (presets[i][0][0] === strSplit[0] || presets[i][0][1] === strSplit[0]) { // if mqtt-string equals either id or name, publish the saved preset
 					mqttClient.publish(MQTT_COLOR_TOPIC, presets[i][1].join(" "));
@@ -104,7 +114,7 @@ function createNewPreset(id, name) {
 	var newPreset = new Array(3);
 	newPreset[0] = [id, name];
 	newPreset[1] = colors.slice();
-	newPreset[0] = settings.slice();
+	newPreset[2] = settings.slice();
 	return newPreset;
 }
 
