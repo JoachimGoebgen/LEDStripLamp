@@ -49,9 +49,7 @@ void loop() {
     if (key == '0') {                                   // --- 0:
       mqttClient.publish(MQTT_SETTINGS_TOPIC, &key);    // [turn off] 0 is not used to publish preset but to turn off LED
     } else if (isDigit(key)) {                          // --- 1/2/3...:
-      mqttClient.publish(MQTT_LOADPRESET_TOPIC, &key);  // [change preset] just publish digit (1, 2, ...) 
-      key = '1';                                        // and
-      mqttClient.publish(MQTT_SETTINGS_TOPIC, &key);    // [change mode] presets are always with mode 1
+      mqttClient.publish(MQTT_PRESET_TOPIC, &key);  	// [change preset] just publish digit (1, 2, ...) 
     } else if (isAlpha(key)) {                          // --- A/B/C/D:
       key -= 16;                                        // A/B/C/D to 1/2/3/4
       mqttClient.publish(MQTT_SETTINGS_TOPIC, &key);    // [change mode] 1=solid, 2=rotating, 3=gradient, 4=party 
@@ -114,7 +112,7 @@ void connectMqtt()
         Serial.print("MQTT connected with client-name '");
         Serial.print(CLIENT_NAME);
         Serial.print("' and will be publishing to topic '");
-        Serial.print(MQTT_LOADPRESET_TOPIC);
+        Serial.print(MQTT_PRESET_TOPIC);
         Serial.print("' and '");
         Serial.print(MQTT_SETTINGS_TOPIC);
         Serial.println("'");
