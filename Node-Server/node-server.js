@@ -61,9 +61,9 @@ mqttClient.on('message', (topic, message) => {
 		if (strSplit.length > 1 && strSplit[0] === "save") { // save
 			var id = strSplit[1];
 			var name; // optional
-			if (strSplit.length == 3) { name = strSplit[3]; } else { name = ""; }
+			if (strSplit.length == 3) { name = strSplit[2]; } else { name = ""; }
 			var newPreset = createNewPreset(id, name);
-			bool idExists = false;
+			var idExists = false;
 			for (i = 0; i < presets.length; i++) {
 				if (presets[i][0][0] === id) {
 					presets[i] = newPreset;
@@ -85,7 +85,7 @@ mqttClient.on('message', (topic, message) => {
 		}
 	}
 	
-	//console.log(msgStr);
+	console.log(msgStr);
 });
 
 function initConfig() {
@@ -107,7 +107,7 @@ function initConfig() {
 		presets.push(newPreset);
 	}
 
-	//console.log(presets);
+	console.log(presets);
 };
 
 function createNewPreset(id, name) {
