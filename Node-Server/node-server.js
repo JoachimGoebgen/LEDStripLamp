@@ -14,6 +14,8 @@ var MQTT_PRESET_TOPIC;
 var MQTT_SRV;
 var mqttClient;
 
+var numSides = 4;
+
 initConfig();
 
 mqttClient.on('connect', () => {
@@ -22,7 +24,9 @@ mqttClient.on('connect', () => {
 	mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC)
 	mqttClient.subscribe(MQTT_PRESET_TOPIC)
 	
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i <= numSides; i++) {
+		// connect to f.e. "/home/lamp/color0", "/home/lamp/color1", ... 
+		// where 0 is broadcast-like for all sides and [1, 2, ..., numSides] represent the lamps' sides
 		mqttClient.subscribe(MQTT_COLOR_TOPIC.concat(i));
 	}
 });
@@ -42,16 +46,25 @@ mqttClient.on('message', (topic, message) => {
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) { 
 		var rgb;
 		if (msgStr.startsWith("#")) { 
-			rgb = hexToRgb(msgStr); // f.e. "#f34ff4"
+			rgb = hexToRgb(msgStr); // convert rgb from hex, f.e. "#f34ff4"
 		} 
 		else { 
-			rgb = cleanEmptyEntries(msgStr.split(" ")); // f.e. "255 40 0"
+			rgb = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
 		} 
 		
-		side = topic.substring(topic.length - 1, topic.length);
-		colors[side*3] = rgb[0];
-		colors[side*3+1] = rgb[1];
-		colors[side*3+2] = rgb[2];
+		side = topic.substring(topic.length - 1, topic.length); //
+		
+		if (side === 0) { // side==0 is broadcast-like to set all sides at once with just one submitted color
+			for (i = 0; i < numSides; i++) {
+				colors[i*3] = rgb[0];
+				colors[i*3+1] = rgb[1];
+				colors[i*3+2] = rgb[2];
+			}
+		} else { // otherwise, set the specified side, side is in range {1, ..., numSides}
+			colors[(side-1)*3] = rgb[0];
+			colors[(side-1)*3+1] = rgb[1];
+			colors[(side-1)*3+2] = rgb[2];
+		}
 		
 		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
 		
