@@ -81,9 +81,9 @@ mqttClient.on('message', (topic, message) => {
 		}
 		
 		for (i = 0; i < numSides; i++) {
-			var newR = colors[i*3] * (1 + sign * brightnessStepPerc);
-			var newG = colors[i*3+1] * (1 + sign * brightnessStepPerc);
-			var newB = colors[i*3+2] * (1 + sign * brightnessStepPerc);
+			var newR = Math.round(colors[i*3] * (1 + sign * brightnessStepPerc));
+			var newG = Math.round(colors[i*3+1] * (1 + sign * brightnessStepPerc));
+			var newB = Math.round(colors[i*3+2] * (1 + sign * brightnessStepPerc));
 			// only update brightness if colors do not exceed the bounds
 			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
 				|| (sign < 0 && newR >= 0 && newG >= 0 && newB >= 0))
