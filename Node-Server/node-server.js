@@ -15,6 +15,7 @@ var MQTT_SRV;
 var mqttClient;
 
 var numSides = 4;
+var brightnessStepPerc = 0.1;
 
 initConfig();
 
@@ -52,7 +53,7 @@ mqttClient.on('message', (topic, message) => {
 			rgb = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
 		} 
 		
-		side = topic.substring(topic.length - 1, topic.length); //
+		var side = topic.substring(topic.length - 1, topic.length); //
 		
 		if (side === 0) { // side==0 is broadcast-like to set all sides at once with just one submitted color
 			for (i = 0; i < numSides; i++) {
@@ -67,7 +68,34 @@ mqttClient.on('message', (topic, message) => {
 		}
 		
 		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
+	
+	// increase or decrease brightness
+	} else if (topic === MQTT_BRIGHTNESS_TOPIC) { 
+		var sign; // cast '+' to 1 and '-' to -1
+		if (msgStr[0] === '+') {
+			sign = 1;
+		} else if (msgStr[0] === '-'){
+			sign = -1;
+		} else {
+			return;
+		}
 		
+		for (i = 0; i < numSides; i++) {
+			var newR = colors[i*3] * (1 + sign * brightnessStepPerc);
+			var newG = colors[i*3+1] * (1 + sign * brightnessStepPerc);
+			var newB = colors[i*3+2] * (1 + sign * brightnessStepPerc);
+			// only update brightness if colors do not exceed the bounds
+			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
+				|| (sign < 0 && newR >= 0 && newG >= 0 && newB >= 0))
+			{
+				colors[i*3] = newR;
+				colors[i*3+1] = newG;
+				colors[i*3+2] = newB;
+			}
+		}
+		
+		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
+	
 	// either load preset or save current state as preset
 	} else if (topic === MQTT_PRESET_TOPIC) { 
 		var strSplit = cleanEmptyEntries(msgStr.split(" "));
