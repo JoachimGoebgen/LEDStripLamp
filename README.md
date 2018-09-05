@@ -1,5 +1,5 @@
 # LEDStripLamp
-Controlling a multi-sided lamp built with a WS281x-strip and a NodeMCU ESP32 Arduino via MQTT and an optional matrix-keypad.
+Controlling a multi-sided lamp built with a WS281x-strip and a NodeMCU ESP32 Arduino via a matrix-keypad through MQTT.
 
 ## Overview 
 This project consists of three parts:
@@ -42,19 +42,42 @@ Just create it in the ```LEDStripLampArduino```-folder and add the following lin
 ```
 
 # Communication
-This section defines the message-formats sent via MQTT.
+This section defines the message-formats sent via MQTT. Each message has its own topic.
 
 ## COLOR Message
 The COLOR-msg makes the lamp change its colors to the specified values. It is published by the control-server after a preset is loaded (received PRESET-msg) or the color of one side is changed (received SIDECOLOR-msg). It is received by the Arduino connected to the WS281x-strip.
 - MQTT-Topic: ```MQTT_COLOR_TOPIC```
-- Format: ```r g b r g b r g b ...``` where each ```r g b```-triplet represents the RGB-color of one side of the lamp. Each r-/g-/b-value has to be between 0 and 255 (one byte) and is seperated to consecutive values by a whitespace.
+- Format: ```r g b r g b r g b r g b ...``` where each ```r g b```-triplet represents the RGB-color of one side of the lamp. Each r-/g-/b-value is in ```[00...FF]``` and is seperated to consecutive values by a whitespace.
 - Example: ```255 255 255 255 0 0 0 147 147 0 0 0``` results in the lamp displaying white on side 1, red on side 2, yellow on side 3 and is off on side 4.
 
 ## SIDECOLOR Message
-The SIDECOLOR-msg makes the lamp change one sides' color to the specified value. It can be published by the user and is received by the control-server, which afterwards publishes a COLOR-msg containing the new colors.
+The SIDECOLOR-msg makes the lamp change one sides' color to the specified value. It can be published by the user/keypad and is received by the control-server, which afterwards publishes a COLOR-msg containing the new colors on all sides.
 - MQTT-Topic: ```MQTT_COLOR_TOPICn``` where n is the number of the side to be changed
-- Format: ```r g b``` where each r-/g-/b-value has to be between 0 and 255 (one byte) and is seperated to consecutive values by a whitespace.
-- Example: ```0 255 0``` sent to ```/SmartHome/LEDStripLam/color3``` results in the lamp displaying full green on side 3 whereas the colors oth the other sides remain untouched.
+- Format: ```r g b``` where each r-/g-/b-value is in ```[0...255]``` and is seperated to consecutive values by a whitespace.
+- Alternative Format: ```#RRGGBB``` where each RR-/GG-/BB-value is the hexadecimal representation of the r-/g-/b-color in ```[00...FF]```
+- Example: ```0 255 0``` or ```#00FF00``` sent to ```/SmartHome/LEDStripLamp/color3``` results in the lamp displaying full green on side 3 whereas the colors on the other sides remain untouched.
+
+
+## BRIGHTNESS Message
+The BRIGHTNESS-msg makes the lamp change its brightness on all sides by a fix percentage. It can be published by the user/keypad and is received by the control-server, which afterwards publishes a COLOR-msg containing the previous colors but with changed brightness.
+- MQTT-Topic: ```MQTT_BRIGHTNESS_TOPIC```
+- Format: ```+``` or ```-``` indicating if the brightness should increase or decrease.
+- Hint: The percentual change can be set in the ```node-server.js```. This message has no effect if one r-/g-/b-value is already 255 (```+```-msg), respective 0 (```-```-msg)
+
+
+## SAVEPRESET Message
+The SAVEPRESET-msg makes the server remember the current configuration (colors and mode) for later restoring. It can be published by the user and is received by the control-server, which afterwards saves the current configuration together with the given preset-ID and -name to the ```presets```-file
+- MQTT-Topic: ```MQTT_SAVEPRESET_TOPIC```
+- Format: ```ID name``` where ID is a number in ```[0...9]``` and name is an arbitrary string (optional).
+- Example: ```5 sunset``` associates the current configuration with the number "5" and the name "sunset" and saves it to the disk.
+
+
+## LOADPRESET Message
+The LOADPRESET-msg makes the lamp restore the configuration (colors and mode) associated with the given ID or name. It can be published by the user/keypad and is received by the control-server, which afterwards publishes the saved configuration via a COLOR-msg.
+- MQTT-Topic: ```MQTT_LOADPRESET_TOPIC```
+- Format: ```ID``` or ```name``` where ID is a number in ```[0...9]``` and name is an arbitrary string, previously saved with a SAVEPRESET-msg.
+- Example: ```5``` or ```sunset``` both restore the configuration that was saved in the SAVEPRESET-example.
+
 
 # Troubleshooting
 
