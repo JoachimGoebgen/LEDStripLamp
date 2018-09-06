@@ -8,9 +8,10 @@ var presets = new Array(0);
 var CONF_FILE_PATH = '../connection_conf.h';
 var PRESET_FILE_PATH = '../presets';
 var MQTT_COLOR_TOPIC;
-var MQTT_SETTINGS_TOPIC;
+var MQTT_MODE_TOPIC;
 var MQTT_BRIGHTNESS_TOPIC;
-var MQTT_PRESET_TOPIC;
+var MQTT_LOADPRESET_TOPIC;
+var MQTT_SAVEPRESET_TOPIC;
 var MQTT_SRV;
 var mqttClient;
 
@@ -21,9 +22,10 @@ initConfig();
 
 mqttClient.on('connect', () => {
 	mqttClient.subscribe(MQTT_COLOR_TOPIC)
-	mqttClient.subscribe(MQTT_SETTINGS_TOPIC)
+	mqttClient.subscribe(MQTT_MODE_TOPIC)
 	mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC)
-	mqttClient.subscribe(MQTT_PRESET_TOPIC)
+	mqttClient.subscribe(MQTT_LOADPRESET_TOPIC)
+	mqttClient.subscribe(MQTT_SAVEPRESET_TOPIC)
 	
 	for (i = 0; i <= numSides; i++) {
 		// connect to f.e. "/home/lamp/color0", "/home/lamp/color1", ... 
@@ -40,7 +42,7 @@ mqttClient.on('message', (topic, message) => {
 		colors = msgStr.split(" ");
 		
 	// mode and speed update
-	} else if (topic === MQTT_SETTINGS_TOPIC) { 
+	} else if (topic === MQTT_MODE_TOPIC) { 
 		settings = msgStr.split(" ");
 	
 	// update a single side and re-publish with whole colors-array
@@ -97,12 +99,12 @@ mqttClient.on('message', (topic, message) => {
 		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
 	
 	// either load preset or save current state as preset
-	} else if (topic === MQTT_PRESET_TOPIC) { 
+	} else if (topic === MQTT_SAVEPRESET_TOPIC) { 
 		var strSplit = cleanEmptyEntries(msgStr.split(" "));
-		if (strSplit.length > 1 && strSplit[0] === "save") { // save
-			var id = strSplit[1];
+		if (strSplit.length >= 1) { // save
+			var id = strSplit[0];
 			var name; // optional
-			if (strSplit.length == 3) { name = strSplit[2]; } else { name = ""; }
+			if (strSplit.length == 2) { name = strSplit[1]; } else { name = ""; }
 			var newPreset = createNewPreset(id, name);
 			var idExists = false;
 			for (i = 0; i < presets.length; i++) {
@@ -115,12 +117,13 @@ mqttClient.on('message', (topic, message) => {
 				presets.push(createNewPreset(id, name));
 			}
 			savePresetsToFile();
-			
-		} else if (strSplit.length == 1) { // load
+		}
+	} else if (topic === MQTT_LOADPRESET_TOPIC) {
+		if (strSplit.length == 1) { // load
 			for (i = 0; i < presets.length; i++) {
 				if (presets[i][0][0] === strSplit[0] || presets[i][0][1] === strSplit[0]) { // if mqtt-string equals either id or name, publish the saved preset
 					mqttClient.publish(MQTT_COLOR_TOPIC, presets[i][1].join(" "));
-					mqttClient.publish(MQTT_SETTINGS_TOPIC, presets[i][2].join(" "));
+					mqttClient.publish(MQTT_MODE_TOPIC, presets[i][2].join(" "));
 				}
 			}
 		}
@@ -133,9 +136,10 @@ function initConfig() {
 	var data = String(fs.readFileSync(CONF_FILE_PATH));
 
 	MQTT_COLOR_TOPIC = data.substring(data.search("MQTT_COLOR_TOPIC")+16).split("\"")[1];
-	MQTT_SETTINGS_TOPIC = data.substring(data.search("MQTT_SETTINGS_TOPIC")+19).split("\"")[1];
+	MQTT_MODE_TOPIC = data.substring(data.search("MQTT_MODE_TOPIC")+15).split("\"")[1];
 	MQTT_BRIGHTNESS_TOPIC = data.substring(data.search("MQTT_BRIGHTNESS_TOPIC")+21).split("\"")[1];
-	MQTT_PRESET_TOPIC = data.substring(data.search("MQTT_PRESET_TOPIC")+17).split("\"")[1];
+	MQTT_LOADPRESET_TOPIC = data.substring(data.search("MQTT_LOADPRESET_TOPIC")+21).split("\"")[1];
+	MQTT_SAVEPRESET_TOPIC = data.substring(data.search("MQTT_SAVEPRESET_TOPIC")+21).split("\"")[1];
 	var port = data.substring(data.search("MQTT_SRV_PORT")+13).split(/\s+/)[1];
 	MQTT_SRV = "mqtt://".concat(data.substring(data.search("MQTT_SRV_IP")+11).split("\"")[1]).concat(":").concat(port);
 

@@ -2,7 +2,7 @@
 #include "FastLED.h"
 #include "WiFi.h"
 #include "PubSubClient.h"
-#include "../connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT, MQTT_TOPIC
+#include "../connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT and all MQTT-topics
 
 FASTLED_USING_NAMESPACE
 
@@ -114,7 +114,7 @@ void connectMqtt()
     if (mqttClient.connect(CLIENT_NAME)) 
     {
       mqttClient.subscribe(MQTT_COLOR_TOPIC);
-      mqttClient.subscribe(MQTT_SETTINGS_TOPIC);
+      mqttClient.subscribe(MQTT_MODE_TOPIC);
 
       #ifdef DEBUG 
         Serial.println("");
@@ -123,7 +123,7 @@ void connectMqtt()
         Serial.print("' and subscribed to topic '");
         Serial.print(MQTT_COLOR_TOPIC);
         Serial.print("' and '");
-        Serial.print(MQTT_SETTINGS_TOPIC);
+        Serial.print(MQTT_MODE_TOPIC);
         Serial.println("'");
       #endif
     } 
@@ -179,7 +179,7 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
       {
         receivedColor(wordCount, value);
       }
-      else if (strcmp(topic, MQTT_SETTINGS_TOPIC) == 0)
+      else if (strcmp(topic, MQTT_MODE_TOPIC) == 0)
       {
         receivedSettings(wordCount, value);
       }
