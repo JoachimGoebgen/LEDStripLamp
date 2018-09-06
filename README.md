@@ -1,55 +1,22 @@
 # LEDStripLamp
 Controlling a multi-sided lamp built with a WS281x-strip and a NodeMCU ESP32 Arduino via a matrix-keypad through MQTT.
 
-## Overview 
 This project consists of three parts:
 - A Raspberry PI (or comparable micro-PC) to run the MQTT-server and the control-server for the lamp.
 - A WS281x-strip wrapped around a frame, controlled by a NodeMCU ESP32 Arduino.
 - An optional 16-key-matrix-keypad connected to an ESP8266-Arduino for a comfortable way to load pre-defined settings.
 
-## I) Node-Server
-Central control unit of the project. Listens for 
+Feel free to take this as a basis for your own project with LED-strips that shall be controlled via MQTT and a keypad.
 
 # Installation
 
 ## Basic software
 - On your Raspberry PI: install, configure and run an MQTT-broker and install Node.js with npm.
 - On your working station: install the Arduino IDE.
+- On both your PI and your working station clone this repo: ```git clone https://github.com/JoachimGoebgen/LEDStripLamp/```
+- On both your PI and your working station, set up your connection_conf.h as described below.
 
-## Node-Server
-- Clone this repository somewhere onto your Raspberry PI (you only need the ```Node-Server``` directory): ```git clone https://github.com/JoachimGoebgen/LEDStripLamp/```
-- Configure your connection_conf.h in ```/LEDStripLamp/connection_conf.h``` as described below
-- Install the Node.js-MQTT-client: ```npm install mqtt --save```
-- Run the control-server: ```node /LEDStripLamp/Node-Server/node-server.js```
-- If you want to make sure the server is up and running at all times, make yourself familiar with [PM2](http://pm2.keymetrics.io/)
-
-## Arduino-LEDLamp and Arduino-Keypad
-Clone this repository somewhere onto your working station: ```git clone https://github.com/JoachimGoebgen/LEDStripLamp/```
-
-### Install FastLED as LED-control in Arduino IDE
-Clone ```https://github.com/FastLED/FastLED``` into ```ARDUINO_SKETCHBOOK_DIR/libraries/FastLED```
-
-### Install PubSubClient as MQTT-client in Arduino IDE
-Clone ```https://github.com/knolleary/pubsubclient``` into ```ARDUINO_SKETCHBOOK_DIR/libraries/pubsubclient```
-
-### Install NodeMCU ESP32 Board in Arduino IDE
-- Clone ```https://github.com/espressif/arduino-esp32``` into ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32``` 
-- Run ```git submodule update --init --recursive``` in ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32```
-- Double-click get.exe (windows) or run ```python2 get.py``` (linux) in ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32/tools```
-- (Re-)start Arduino IDE
-- Select ```NodeMCU-32S``` under Tools -> Boards
-- Finally, load the ```/LEDStripLamp/Arduino-LEDLamp/Arduino-LEDLamp.ino``` onto your ESP32-board, which will run your LED-strip.
-
-### Install NodeMCU ESP8266 Board in Arduino IDE
-- Clone ```https://github.com/espressif/arduino-esp32``` into ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32``` 
-- Run ```git submodule update --init --recursive``` in ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32```
-- Double-click get.exe (windows) or run ```python2 get.py``` (linux) in ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32/tools```
-- (Re-)start Arduino IDE
-- Select ```NodeMCU-32S``` under Tools -> Boards
-- Finally, load the ```/LEDStripLamp/Arduino-LEDLamp/Arduino-LEDLamp.ino``` onto your ESP32-board, which will run your LED-strip.
-
-
-## connection_conf.h	
+## Configure connection_conf.h
 This header-file is used as config for your sensible information like your WiFi-password.
 Just create it in ```/LEDStripLamp/connection_conf.h``` and add the following lines:
 ```
@@ -65,6 +32,34 @@ Just create it in ```/LEDStripLamp/connection_conf.h``` and add the following li
 #define MQTT_LOADPRESET_TOPIC   "some topic like /SmartHome/LEDStripLamp/loadpreset"
 #define MQTT_SAVEPRESET_TOPIC   "some topic like /SmartHome/LEDStripLamp/savepreset"
 ```
+
+## Set up Node-Server
+On your Raspberry PI you only need the ```Node-Server``` directory.
+- Install the Node.js-MQTT-client: ```npm install mqtt --save```
+- Run the control-server: ```node /LEDStripLamp/Node-Server/node-server.js```
+- If you want to make sure the server is up and running at all times, make yourself familiar with [PM2](http://pm2.keymetrics.io/)
+
+## Set up Arduino-LEDLamp and Arduino-Keypad
+On your working station you only need the 
+
+#### Install FastLED as LED-control in Arduino IDE
+- Clone ```https://github.com/FastLED/FastLED``` into ```ARDUINO_SKETCHBOOK_DIR/libraries/FastLED```
+
+#### Install PubSubClient as MQTT-client in Arduino IDE
+- Clone ```https://github.com/knolleary/pubsubclient``` into ```ARDUINO_SKETCHBOOK_DIR/libraries/pubsubclient```
+
+#### Install NodeMCU ESP32 Board in Arduino IDE
+- Clone ```https://github.com/espressif/arduino-esp32``` into ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32``` 
+- Run ```git submodule update --init --recursive``` in ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32```
+- Double-click get.exe (windows) or run ```python2 get.py``` (linux) in ```ARDUINO_SKETCHBOOK_DIR/hardware/espressif/esp32/tools```
+- (Re-)start Arduino IDE and select ```NodeMCU-32S``` under ```Tools -> Boards```
+- Finally, load the ```/LEDStripLamp/Arduino-LEDLamp/Arduino-LEDLamp.ino``` onto your ESP32-board, which will run your LED-strip.
+
+#### Install NodeMCU ESP8266 Board in Arduino IDE
+- In the Arduino IDE, go to ```Files -> Preferences``` and add ```http://arduino.esp8266.com/stable/package_esp8266com_index.json``` under ```Additional Board Manager URLs```
+- Search and install ```esp8266``` under ```Tools -> Boards -> Boards Manager```
+- Select ```Generic NodeMCU 1.0``` under ```Tools -> Boards```
+- Finally, load the ```/LEDStripLamp/Arduino-Keypad/Arduino-Keypad.ino``` onto your ESP8266-board, which will take inputs from your keypad.
 
 # Communication
 This section defines the message-formats sent via MQTT. Each message has its own topic.
