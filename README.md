@@ -1,20 +1,19 @@
 # LEDStripLamp
-Controlling a multi-sided lamp built with a WS281x-strip and a NodeMCU ESP32 Arduino via a matrix-keypad through MQTT.
+Controlling a multi-sided lamp built with a WS281x-strip and a NodeMCU ESP32 Arduino via a matrix-keypad through MQTT. Feel free to take this as a basis for your own project with LED-strips that shall be controlled via MQTT and a keypad.
 
 This project consists of three parts:
 - A Raspberry PI (or comparable micro-PC) to run the MQTT-server and the control-server for the lamp.
 - A WS281x-strip wrapped around a frame, controlled by a NodeMCU ESP32 Arduino.
 - An optional 16-key-matrix-keypad connected to an ESP8266-Arduino for a comfortable way to load pre-defined settings.
 
-Feel free to take this as a basis for your own project with LED-strips that shall be controlled via MQTT and a keypad.
-
 # Installation
+This section provides short setup instructions only to get the three parts of the system up and running. This is not a full step-by-step project-guide.
 
-## Basic software
-- On your Raspberry PI: install, configure and run an MQTT-broker and install Node.js with npm.
-- On your working station: install the Arduino IDE.
-- On both your PI and your working station clone this repo: ```git clone https://github.com/JoachimGoebgen/LEDStripLamp/```
-- On both your PI and your working station, set up your connection_conf.h as described below.
+## Install basic software
+- On your Raspberry PI, install and run an MQTT-broker and install Node.js with npm.
+- On your working station, install the Arduino IDE.
+- On both your PI and your working station, clone this repo: ```git clone https://github.com/JoachimGoebgen/LEDStripLamp/```
+- On both your PI and your working station, configure your connection_conf.h as described below.
 
 ## Configure connection_conf.h
 This header-file is used as config for your sensible information like your WiFi-password.
@@ -34,13 +33,13 @@ Just create it in ```/LEDStripLamp/connection_conf.h``` and add the following li
 ```
 
 ## Set up Node-Server
-On your Raspberry PI you only need the ```Node-Server``` directory.
+On your Raspberry PI you only need the ```Node-Server``` directory from this repo.
 - Install the Node.js-MQTT-client: ```npm install mqtt --save```
 - Run the control-server: ```node /LEDStripLamp/Node-Server/node-server.js```
 - If you want to make sure the server is up and running at all times, make yourself familiar with [PM2](http://pm2.keymetrics.io/)
 
 ## Set up Arduino-LEDLamp and Arduino-Keypad
-On your working station you only need the 
+On your working station you only need the ```Arduino-LEDLamp``` and ```Arduino-Keypad``` directory from this repo.
 
 #### Install FastLED as LED-control in Arduino IDE
 - Clone ```https://github.com/FastLED/FastLED``` into ```ARDUINO_SKETCHBOOK_DIR/libraries/FastLED```
@@ -62,7 +61,7 @@ On your working station you only need the
 - Finally, load the ```/LEDStripLamp/Arduino-Keypad/Arduino-Keypad.ino``` onto your ESP8266-board, which will take inputs from your keypad.
 
 # Communication
-This section defines the message-formats sent via MQTT. Each message has its own topic.
+This section defines the message-formats sent via MQTT, each message has its own topic for the sake of modularity.
 
 ## COLOR Message
 The COLOR-msg makes the lamp change its colors to the specified values. It is published by the control-server after a preset is loaded (received PRESET-msg) or the color of one side is changed (received SIDECOLOR-msg). It is received by the Arduino connected to the WS281x-strip.
