@@ -6,6 +6,8 @@ This project consists of three parts:
 - A WS281x-strip wrapped around a frame, controlled by a NodeMCU ESP32 Arduino.
 - An optional 16-key-matrix-keypad connected to an ESP8266-Arduino for a comfortable way to load pre-defined settings.
 
+![Lamp](https://i.imgur.com/BPRM2Qz.jpg)
+
 # Installation
 This section provides short setup instructions only to get the three parts of the system up and running. This is not a full step-by-step project-guide.
 
