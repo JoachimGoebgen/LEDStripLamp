@@ -5,8 +5,8 @@ var settings = new Array(2);
 var colors = new Array(12);
 var presets = new Array(0);
 
-var CONF_FILE_PATH = '../connection_conf.h';
-var PRESET_FILE_PATH = '../presets';
+var CONF_FILE_PATH = 'connection_conf.h';
+var PRESET_FILE_PATH = 'presets';
 var MQTT_COLOR_TOPIC;
 var MQTT_MODE_TOPIC;
 var MQTT_BRIGHTNESS_TOPIC;

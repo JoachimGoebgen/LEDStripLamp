@@ -2,7 +2,7 @@
 #include "FastLED.h"
 #include "WiFi.h"
 #include "PubSubClient.h"
-#include "../connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT and all MQTT-topics
+#include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT and all MQTT-topics
 
 FASTLED_USING_NAMESPACE
 
