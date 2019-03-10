@@ -175,17 +175,17 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
       
       value = toNumber(msg, i - digitPos, i - 1);
       
-	  if (strstr(topic, MQTT_COLOR_TOPIC))
-	  {
-		byte sideNr = topic[strlen(topic) - 1] - 48;
-		if (sideNr == 0)
-		{
-			receivedColor(wordCount, value); // all sides
-		}
-		else
-		{
-			receivedColor(wordCount + 3 * (sideNr - 1), value); // only one side
-		}
+  	  if (strstr(topic, MQTT_COLOR_TOPIC))
+  	  {
+    		byte sideNr = topic[strlen(topic) - 1] - 48;
+    		if (sideNr == 0)
+    		{
+    			receivedColor(wordCount, value); // all sides
+    		}
+    		else
+    		{
+    			receivedColor(wordCount + 3 * (sideNr - 1), value); // only one side
+    		}
       }
       else if (strcmp(topic, MQTT_MODE_TOPIC) == 0)
       {
@@ -379,4 +379,3 @@ int next(int side)
 {
   return (side + 1) % NUM_SIDES;
 }
-

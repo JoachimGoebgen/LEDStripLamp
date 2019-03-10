@@ -110,6 +110,7 @@ mqttClient.on('message', (topic, message) => {
 			savePresetsToFile();
 		}
 	} else if (topic === MQTT_LOADPRESET_TOPIC) {
+		var strSplit = cleanEmptyEntries(msgStr.split(" "));
 		if (strSplit.length == 1) { // load
 			for (i = 0; i < presets.length; i++) {
 				if (presets[i][0][0] === strSplit[0] || presets[i][0][1] === strSplit[0]) { // if mqtt-string equals either id or name, publish the saved preset
