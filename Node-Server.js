@@ -35,7 +35,7 @@ mqttClient.on('message', (topic, message) => {
 	var msgStr = message.toString();
 	
 	// mode and speed update
-	} else if (topic === MQTT_MODE_TOPIC) { 
+	if (topic === MQTT_MODE_TOPIC) { 
 		settings = msgStr.split(" ");
 	
 	// color update
