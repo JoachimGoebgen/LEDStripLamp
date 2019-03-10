@@ -1,4 +1,4 @@
-#include <ESP8266WiFi.h>
+#include "WiFi.h"
 #include "PubSubClient.h"
 #include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT, MQTT_TOPIC
 #include <Keypad.h>
@@ -6,18 +6,15 @@
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
-// strange behaviour here... 
-// If we replace rowPins and colPins with each other, nothing works anymore
-// Therefore just exchange row- and column-definitions in keys-array
 const byte rows = 4; // nunmber of rows
 const byte cols = 4; // number of columns
-byte rowPins[rows] = {D4, D3, D2, D1}; //connect to the row pinouts of the keypad
-byte colPins[cols] = {D8, D7, D6, D5}; //connect to the column pinouts of the keypad
+byte rowPins[rows] = {16, 17, 21, 22}; //connect to the row pinouts of the keypad
+byte colPins[cols] = {5, 23, 19, 18}; //connect to the column pinouts of the keypad
 char keys[rows][cols] = {
-  {'1','4','7','*'},
-  {'2','5','8','0'},
-  {'3','6','9','#'},
-  {'A','B','C','D'}
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
 };
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
 
