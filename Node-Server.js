@@ -21,31 +21,23 @@ var brightnessStepPerc = 0.1;
 initConfig();
 
 mqttClient.on('connect', () => {
-	mqttClient.subscribe(MQTT_COLOR_TOPIC)
-	mqttClient.subscribe(MQTT_MODE_TOPIC)
-	mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC)
-	mqttClient.subscribe(MQTT_LOADPRESET_TOPIC)
-	mqttClient.subscribe(MQTT_SAVEPRESET_TOPIC)
-	
-	for (i = 0; i <= numSides; i++) {
-		// connect to f.e. "/home/lamp/color0", "/home/lamp/color1", ... 
-		// where 0 is broadcast-like for all sides and [1, 2, ..., numSides] represent the lamps' sides
-		mqttClient.subscribe(MQTT_COLOR_TOPIC.concat(i));
-	}
+	// connect to f.e. "/home/lamp/color0", "/home/lamp/color1", ... 
+	// where 0 is broadcast-like for all sides and [1, 2, ..., numSides] represent the lamps' sides
+	mqttClient.subscribe(MQTT_COLOR_TOPIC.concat("/+"));
+	mqttClient.subscribe(MQTT_MODE_TOPIC);
+	mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC);
+	mqttClient.subscribe(MQTT_LOADPRESET_TOPIC);
+	mqttClient.subscribe(MQTT_SAVEPRESET_TOPIC);
 });
 
 mqttClient.on('message', (topic, message) => {
 	var msgStr = message.toString();
 	
-	// normal color update 
-	if (topic === MQTT_COLOR_TOPIC) { 
-		colors = msgStr.split(" ");
-		
 	// mode and speed update
 	} else if (topic === MQTT_MODE_TOPIC) { 
 		settings = msgStr.split(" ");
 	
-	// update a single side and re-publish with whole colors-array
+	// color update
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) { 
 		var rgb;
 		if (msgStr.startsWith("#")) { 
@@ -55,7 +47,7 @@ mqttClient.on('message', (topic, message) => {
 			rgb = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
 		} 
 		
-		var side = topic.substring(topic.length - 1, topic.length); //
+		var side = topic.substring(topic.length - 1, topic.length); 
 		
 		if (side === 0) { // side==0 is broadcast-like to set all sides at once with just one submitted color
 			for (i = 0; i < numSides; i++) {
@@ -68,8 +60,6 @@ mqttClient.on('message', (topic, message) => {
 			colors[(side-1)*3+1] = rgb[1];
 			colors[(side-1)*3+2] = rgb[2];
 		}
-		
-		mqttClient.publish(MQTT_COLOR_TOPIC, colors.join(" "));
 	
 	// increase or decrease brightness
 	} else if (topic === MQTT_BRIGHTNESS_TOPIC) { 

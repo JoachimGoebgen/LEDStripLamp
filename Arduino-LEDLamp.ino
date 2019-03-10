@@ -11,7 +11,7 @@ FASTLED_USING_NAMESPACE
 #define COLOR_ORDER     GRB
 
 #define LEDS_PER_ROW    20
-#define NUM_SIDES       4
+#define NUM_SIDES       4 // <= 9
 #define NUM_ROWS        3
 #define START_OFFSET    11
 
@@ -113,17 +113,17 @@ void connectMqtt()
     
     if (mqttClient.connect(CLIENT_NAME)) 
     {
-      mqttClient.subscribe(MQTT_COLOR_TOPIC);
       mqttClient.subscribe(MQTT_MODE_TOPIC);
-
+      mqttClient.subscribe(MQTT_COLOR_TOPIC + "/+");
+	  
       #ifdef DEBUG 
         Serial.println("");
         Serial.print("MQTT connected with client-name '");
         Serial.print(CLIENT_NAME);
         Serial.print("' and subscribed to topic '");
-        Serial.print(MQTT_COLOR_TOPIC);
-        Serial.print("' and '");
         Serial.print(MQTT_MODE_TOPIC);
+        Serial.print("' and to all sub-topics of '");
+        Serial.print(MQTT_COLOR_TOPIC);
         Serial.println("'");
       #endif
     } 
@@ -174,14 +174,22 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
       if (digitPos == 0) { continue; } // two consecutive spaces
       
       value = toNumber(msg, i - digitPos, i - 1);
-
-      if (strcmp(topic, MQTT_COLOR_TOPIC) == 0)
-      {
-        receivedColor(wordCount, value);
+      
+	  if (strstr(topic, MQTT_COLOR_TOPIC))
+	  {
+		byte sideNr = topic[strlen(topic) - 1] - 48;
+		if (sideNr == 0)
+		{
+			receivedColor(wordCount, value); // all sides
+		}
+		else
+		{
+			receivedColor(wordCount + 3 * (sideNr - 1), value); // only one side
+		}
       }
       else if (strcmp(topic, MQTT_MODE_TOPIC) == 0)
       {
-        receivedSettings(wordCount, value);
+        receivedMode(wordCount, value);
       }
       
       digitPos = 0;
@@ -208,7 +216,7 @@ void receivedColor(byte wordCount, byte value)
   }
 }
 
-void receivedSettings(byte wordCount, byte value) 
+void receivedMode(byte wordCount, byte value) 
 {
   switch(wordCount)
   {
