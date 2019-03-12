@@ -122,6 +122,8 @@ void connectMqtt()
         Serial.print(CLIENT_NAME);
         Serial.print("' and subscribed to topic '");
         Serial.print(MQTT_MODE_TOPIC);
+        Serial.print("' and to topic '");
+        Serial.print(MQTT_BRIGHTNESS_TOPIC);
         Serial.print("' and to all sub-topics of '");
         Serial.print(MQTT_COLOR_TOPIC);
         Serial.println("'");
@@ -153,87 +155,129 @@ void connectMqtt()
 // has to be this format, otherwise unexpected stuff will happen due to no checks existing
 void receivedMsg(char* topic, byte* msg, unsigned int length)
 {
-  #ifdef DEBUG 
-    Serial.print("Message received in topic ");
-    Serial.print(topic);
-    Serial.print(" : ");
-  #endif
+	#ifdef DEBUG 
+		Serial.print("Message received in topic ");
+		Serial.print(topic);
+		Serial.print(" : ");
+		Serial.print(msg);
+	#endif
+	    
+	if (strcmp(topic, MQTT_MODE_TOPIC) == 0)
+	{
+		updateMode(toByteDec(msg));
+	}
+	else if (strcmp(topic, MQTT_COLOR_TOPIC) == 0)
+	{
+		byte *msgPartPtr = strtok(msg, " ");
+		byte wordNr = 0;
+		
+		while (msgPartPtr != NULL) 
+		{
+			if (msgPartPtr[0] == 35) // #HEX f.e. #ff244e #55f4e4 ...
+			{
+				updateColorRGB(0, wordNr + 1, toByteHex(msgPartPtr, 1, 2));
+				updateColorRGB(1, wordNr + 1, toByteHex(msgPartPtr, 3, 4));
+				updateColorRGB(2, wordNr + 1, toByteHex(msgPartPtr, 5, 6));
+			}
+			else // decimals f.e. 255 120 0 241 255 60 ... (rgb-triplets)
+			{
+				// split msg by spaces and convert digits inbetween to numbers
+				updateColorRGB(wordNr % 3, wordNr / 3 + 1, toByteDec(msgPartPtr));
+			}
+			
+			msgPartPtr = strtok(NULL, " ");
+			wordNr++;
+		}
+	}
+	else if (strstr(topic, MQTT_COLOR_TOPIC)) // update a single side or all sides with the same color at once
+	{
+		byte *msgPartPtr = strtok(msg, " ");
+		byte sideNr = topic[strlen(topic) - 1] - 48;
+		
+		if (msgPartPtr[0] == 35) // #HEX f.e. #ff244e
+		{
+			updateColorRGB(0, sideNr, toByteHex(msgPartPtr, 1, 2));
+			updateColorRGB(1, sideNr, toByteHex(msgPartPtr, 3, 4));
+			updateColorRGB(2, sideNr, toByteHex(msgPartPtr, 5, 6));
+		}
+		else // decimals f.e. 255 120 0 
+		{
+			// split msg by spaces and convert digits inbetween to numbers
+			updateColorRGB(0, sideNr, toByteDec(msgPartPtr));
+			
+			msgPartPtr = strtok(NULL, " ");
+			updateColorRGB(1, sideNr, toByteDec(msgPartPtr));
+			
+			msgPartPtr = strtok(NULL, " ");
+			updateColorRGB(2, sideNr, toByteDec(msgPartPtr));
+		}
+	}
   
-  byte digitPos = 0;
-  byte wordCount = 0;
-  byte value;
-  // split msg by spaces and convert digits inbetween to numbers
-  for (unsigned int i = 0; i <= length; i++)
-  {
-    #ifdef DEBUG 
-      if (i < length) { Serial.print((char)msg[i]); }
-    #endif
-    
-    if (i == length || msg[i] == 32) // space
-    {
-      if (digitPos == 0) { continue; } // two consecutive spaces
-      
-      value = toNumber(msg, i - digitPos, i - 1);
-      
-  	  if (strstr(topic, MQTT_COLOR_TOPIC))
-  	  {
-    		byte sideNr = topic[strlen(topic) - 1] - 48;
-    		if (sideNr == 0)
-    		{
-    			receivedColor(wordCount, value); // all sides
-    		}
-    		else
-    		{
-    			receivedColor(wordCount + 3 * (sideNr - 1), value); // only one side
-    		}
-      }
-      else if (strcmp(topic, MQTT_MODE_TOPIC) == 0)
-      {
-        receivedMode(wordCount, value);
-      }
-      
-      digitPos = 0;
-      wordCount++;
-    }
-    else 
-    {
-      digitPos++;
-    }
-  }
-  
-  #ifdef DEBUG 
-    Serial.println("");
-  #endif
+	#ifdef DEBUG 
+		Serial.println("");
+	#endif
 }
 
-void receivedColor(byte wordCount, byte value) 
+// rgbNr: 0,1,2
+// sideNr: 1...NUM_SIDES   (0 for all sides)
+void updateColorRGB(byte rgbNr, byte sideNr, byte value) 
 {
-  switch(wordCount % 3)
-  {
-    case 0: R[wordCount / 3] = value; break;
-    case 1: G[wordCount / 3] = value; break;
-    case 2: B[wordCount / 3] = value; break; 
-  }
+	byte from;
+	byte to;
+	if (sideNr == 0) 
+	{
+		from = 1;
+		to = NUM_SIDES;
+	}
+	else 
+	{
+		from = sideNr;
+		to = sideNr;
+	}
+	
+	for (byte side = from; i <= to; i++)
+	{
+		switch(rgbNr)
+		{
+			case 0: R[side - 1] = value; break;
+			case 1: G[side - 1] = value; break;
+			case 2: B[side - 1] = value; break; 
+			default: break;
+		}
+	}
 }
 
-void receivedMode(byte wordCount, byte value) 
+void updateMode(byte wordCount, byte value) 
 {
-  switch(wordCount)
-  {
-    case 0: LedMode = value; break;
-    case 1: SpeedUpFactor = value / (double)100; break;
-  }
+	LedMode = value;
 }
 
-byte toNumber(byte* msg, int from_incl, int to_incl)
+byte toByteDec(char* digitStr)
 {
-  int count = to_incl - from_incl + 1; // number of digits
-  byte sum = 0;
-  for (int i = 0; i < count; i++)
-  {
-    sum += (msg[from_incl + i] - 48) * pow(10, count - 1 - i); // convert "char" to its represented number and sum it up depending on its place
-  }
-  return sum;
+	return (byte)atoi(digitStr);
+}
+
+byte toByteHex(char digitA, char digitB) // only two digits
+{
+	byte sum = 0;
+
+	if (digitA >= 48 && digitA <= 57) { // 0 ... 9
+	sum += (digitA - 48) * 16;
+	} else if (digitA >= 65 && digitA <= 70) { // A ... F
+	sum += (digitA - 55) * 16;
+	} else if (digitA >= 97 && digitA <= 102) { // a ... f
+	sum += (digitA - 87) * 16;
+	}
+
+	if (digitB >= 48 && digitB <= 57) { // 0 ... 9
+	sum += (digitB - 48);
+	} else if (digitB >= 65 && digitB <= 70) { // A ... F
+	sum += (digitB - 55);
+	} else if (digitB >= 97 && digitB <= 102) { // a ... f
+	sum += (digitB - 87);
+	}
+
+	return sum;
 }
 
 // --------------------------------- MODES ---------------------------------
