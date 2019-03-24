@@ -38,7 +38,18 @@ mqttClient.on('message', (topic, message) => {
 	if (topic === MQTT_MODE_TOPIC) { 
 		settings = msgStr.split(" ");
 	
-	// color update
+	// color-parent-topic: Contains color-values for each side
+	} else if (topic === MQTT_COLOR_TOPIC) {
+		var rgb;
+		if (msgStr.startsWith("#")) { 
+			rgb = hexToRgb(msgStr); // convert rgb from hex, f.e. "#f34ff4"
+		} 
+		else { 
+			rgb = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
+		} 
+		...
+		
+	// color-sub-topic: To update a single side or all sides with the same color at once 	
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) { 
 		var rgb;
 		if (msgStr.startsWith("#")) { 
