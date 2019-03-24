@@ -1,6 +1,6 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
 #include "FastLED.h"
-#include "WiFi.h"
+#include <WiFi.h>
 #include "PubSubClient.h"
 #include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT and all MQTT-topics
 
@@ -11,7 +11,7 @@ FASTLED_USING_NAMESPACE
 #define COLOR_ORDER     GRB
 
 #define LEDS_PER_ROW    20
-#define NUM_SIDES       4 // <= 9
+#define NUM_SIDES       4 // maximum 9
 #define NUM_ROWS        3
 #define START_OFFSET    11
 
@@ -27,8 +27,7 @@ CRGB leds[TOTAL_LEDS];
 byte R[NUM_SIDES];
 byte G[NUM_SIDES];
 byte B[NUM_SIDES];
-double SpeedUpFactor = 1;
-int LedMode = 2;
+int LedMode = 1;
 
 // 
 int rotationOffset = 0;
@@ -81,17 +80,37 @@ void connectWifi()
     Serial.print("Connecting to WiFi named ");
     Serial.println(WIFI_SSID);
   #endif
-
+  
   WiFi.begin(WIFI_SSID, WIFI_KEY);
   WiFi.setHostname(CLIENT_NAME);
-
+  
+  byte c = 10;
   while (WiFi.status() != WL_CONNECTED) 
   {
-      #ifdef DEBUG 
-        Serial.print("."); 
-      #endif
-      
-      delay(500);
+      if (c == 0) // try reconnect after some time if it didn't work
+      {
+        #ifdef DEBUG
+          Serial.println("");
+          Serial.println("Reconnecting");
+        #endif
+        
+        WiFi.disconnect(true);
+        delay(1000);
+        WiFi.mode(WIFI_STA);
+        delay(1000);
+        WiFi.begin(WIFI_SSID, WIFI_KEY);
+        WiFi.setHostname(CLIENT_NAME);
+        c = 10;
+      }
+      else // wait for connection ...
+      {
+        #ifdef DEBUG 
+          Serial.print("."); 
+        #endif
+  
+        delay(500);
+        c--;
+      }
   }
 
   #ifdef DEBUG 
@@ -114,7 +133,15 @@ void connectMqtt()
     if (mqttClient.connect(CLIENT_NAME)) 
     {
       mqttClient.subscribe(MQTT_MODE_TOPIC);
-      mqttClient.subscribe(MQTT_COLOR_TOPIC + "/+");
+      mqttClient.subscribe(MQTT_COLOR_TOPIC);
+      mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC);
+      
+      char subColorTopic[strlen(MQTT_COLOR_TOPIC)+3] = {0};
+      strcat(subColorTopic, MQTT_COLOR_TOPIC);
+      strcat(subColorTopic, "/+");
+      /*sprintf(subColorTopic, "%s%s", MQTT_COLOR_TOPIC, "/+");*/
+      mqttClient.subscribe(subColorTopic);
+      Serial.println(subColorTopic);
 	  
       #ifdef DEBUG 
         Serial.println("");
@@ -151,6 +178,8 @@ void connectMqtt()
   }
 }
 
+// -------------------------- MSG HANDLING AND UPDATE --------------------------
+
 // msg format: r1 g1 b1 r2 g2 b2 ... rn gn bn
 // has to be this format, otherwise unexpected stuff will happen due to no checks existing
 void receivedMsg(char* topic, byte* msg, unsigned int length)
@@ -158,67 +187,100 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
 	#ifdef DEBUG 
 		Serial.print("Message received in topic ");
 		Serial.print(topic);
-		Serial.print(" : ");
-		Serial.print(msg);
+    Serial.print(" : ");
+    for (byte i = 0; i < length; i++)
+    {
+      if (msg[i] == 32) { Serial.print(" "); }
+      else { Serial.print(msg[i] - 48); }
+    }
+    Serial.println("");
 	#endif
+	
+	if (length == 0)
+		return;
 	    
+	// lamp-mode: 0 ... 4
 	if (strcmp(topic, MQTT_MODE_TOPIC) == 0)
 	{
-		updateMode(toByteDec(msg));
+		updateMode(toNumberDec(msg, 0, 0));
 	}
+ 
+	// + or - to incerease or decrease brightness
+	else if (strcmp(topic, MQTT_BRIGHTNESS_TOPIC) == 0)
+	{
+		updateBrightness(msg[0]);
+	}
+ 
+	// color-parent-topic: Contains color-values for each side
 	else if (strcmp(topic, MQTT_COLOR_TOPIC) == 0)
 	{
-		byte *msgPartPtr = strtok(msg, " ");
 		byte wordNr = 0;
-		
-		while (msgPartPtr != NULL) 
-		{
-			if (msgPartPtr[0] == 35) // #HEX f.e. #ff244e #55f4e4 ...
-			{
-				updateColorRGB(0, wordNr + 1, toByteHex(msgPartPtr, 1, 2));
-				updateColorRGB(1, wordNr + 1, toByteHex(msgPartPtr, 3, 4));
-				updateColorRGB(2, wordNr + 1, toByteHex(msgPartPtr, 5, 6));
-			}
-			else // decimals f.e. 255 120 0 241 255 60 ... (rgb-triplets)
-			{
-				// split msg by spaces and convert digits inbetween to numbers
-				updateColorRGB(wordNr % 3, wordNr / 3 + 1, toByteDec(msgPartPtr));
-			}
-			
-			msgPartPtr = strtok(NULL, " ");
-			wordNr++;
-		}
+    byte digitNr = 0;
+
+    for (unsigned int i = 0; i <= length; i++)
+    {
+      if (i == length || msg[i] == ' ') // space
+      {
+        if (digitNr == 0) { continue; } // two consecutive spaces or leading space
+
+        if (msg[i - 7] == '#') // #HEX f.e. #ff204e #55f4e4 ...
+        { 
+          if (wordNr >= NUM_SIDES || digitNr != 7) { return; }
+          updateColorRGB(0, wordNr + 1, toNumberHex(msg[i - 6], msg[i - 5]));
+          updateColorRGB(1, wordNr + 1, toNumberHex(msg[i - 4], msg[i - 3]));
+          updateColorRGB(2, wordNr + 1, toNumberHex(msg[i - 3], msg[i - 1]));
+        }
+        else // decimals f.e. 255 120 0 241 255 60 ... (rgb-triplets)
+        {
+          if (wordNr >= NUM_SIDES * 3 || digitNr > 3) { return; }
+          updateColorRGB(wordNr % 3, wordNr / 3 + 1, toNumberDec(msg, i - digitNr, i - 1));
+        }
+        
+        digitNr = 0;
+        wordNr++;
+      }
+      else { digitNr++; }
+    }
 	}
-	else if (strstr(topic, MQTT_COLOR_TOPIC)) // update a single side or all sides with the same color at once
+ 
+	// color-sub-topic: To update a single side or all sides with the same color at once
+	else if (strstr(topic, MQTT_COLOR_TOPIC)) 
 	{
-		byte *msgPartPtr = strtok(msg, " ");
 		byte sideNr = topic[strlen(topic) - 1] - 48;
-		
-		if (msgPartPtr[0] == 35) // #HEX f.e. #ff244e
-		{
-			updateColorRGB(0, sideNr, toByteHex(msgPartPtr, 1, 2));
-			updateColorRGB(1, sideNr, toByteHex(msgPartPtr, 3, 4));
-			updateColorRGB(2, sideNr, toByteHex(msgPartPtr, 5, 6));
-		}
-		else // decimals f.e. 255 120 0 
-		{
-			// split msg by spaces and convert digits inbetween to numbers
-			updateColorRGB(0, sideNr, toByteDec(msgPartPtr));
-			
-			msgPartPtr = strtok(NULL, " ");
-			updateColorRGB(1, sideNr, toByteDec(msgPartPtr));
-			
-			msgPartPtr = strtok(NULL, " ");
-			updateColorRGB(2, sideNr, toByteDec(msgPartPtr));
-		}
+    if (sideNr > NUM_SIDES)
+      return;
+      
+    byte wordNr = 0;
+    byte digitNr = 0;
+
+    for (unsigned int i = 0; i <= length; i++)
+    {
+      if (i == length || msg[i] == ' ') // space
+      {
+        if (digitNr == 0) { continue; } // two consecutive spaces
+
+        if (msg[i - 7] == '#') // #HEX f.e. #ff204e (only one hex-Nr)
+        { 
+          if (wordNr > 0 || digitNr != 7) { return; }
+          updateColorRGB(0, sideNr, toNumberHex(msg[i - 6], msg[i - 5]));
+          updateColorRGB(1, sideNr, toNumberHex(msg[i - 4], msg[i - 3]));
+          updateColorRGB(2, sideNr, toNumberHex(msg[i - 3], msg[i - 1]));
+        }
+        else // decimals f.e. 255 120 0 (only one rgb-triplet)
+        {
+          if (wordNr >= 3) { return; }
+          updateColorRGB(wordNr, sideNr, toNumberDec(msg, i - digitNr, i - 1));
+        }
+        
+        digitNr = 0;
+        wordNr++;
+      }
+      else { digitNr++; }
+    }
 	}
-  
-	#ifdef DEBUG 
-		Serial.println("");
-	#endif
 }
 
-// rgbNr: 0,1,2
+// rgbNr: 0=red, 1=green, 2=blue
 // sideNr: 1...NUM_SIDES   (0 for all sides)
 void updateColorRGB(byte rgbNr, byte sideNr, byte value) 
 {
@@ -235,7 +297,7 @@ void updateColorRGB(byte rgbNr, byte sideNr, byte value)
 		to = sideNr;
 	}
 	
-	for (byte side = from; i <= to; i++)
+	for (byte side = from; side <= to; side++)
 	{
 		switch(rgbNr)
 		{
@@ -247,34 +309,70 @@ void updateColorRGB(byte rgbNr, byte sideNr, byte value)
 	}
 }
 
-void updateMode(byte wordCount, byte value) 
+void updateMode(byte value) 
 {
 	LedMode = value;
 }
 
-byte toByteDec(char* digitStr)
+void updateBrightness(byte msg) 
 {
-	return (byte)atoi(digitStr);
+	int sign; // cast '+' to 1 and '-' to -1
+	if (msg == '+') {
+		sign = 1;
+	} else if (msg == '-'){
+		sign = -1;
+	} else {
+		return;
+	}
+	
+	for (byte sideNr = 0; sideNr < NUM_SIDES; sideNr++)
+	{
+		for (byte i = 0; i < NUM_SIDES; i++)
+		{
+			byte newR = (byte) round(R[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+			byte newG = (byte) round(G[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+			byte newB = (byte) round(B[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+			// only update brightness if colors do not exceed the bounds
+			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
+				|| (sign < 0 && newR >= 0 && newG >= 0 && newB >= 0))
+			{
+				R[i] = newR;
+				G[i] = newG;
+				B[i] = newB;
+			}
+		}
+	}
 }
 
-byte toByteHex(char digitA, char digitB) // only two digits
+byte toNumberDec(byte* msg, int from_incl, int to_incl)
+{
+  int count = to_incl - from_incl + 1; // number of digits
+  byte sum = 0;
+  for (int i = 0; i < count; i++)
+  {
+    sum += (msg[from_incl + i] - 48) * pow(10, count - 1 - i); // convert "char" to its represented number and sum it up depending on its place
+  }
+  return sum;
+}
+
+byte toNumberHex(byte digitA, byte digitB) // only two digits
 {
 	byte sum = 0;
 
 	if (digitA >= 48 && digitA <= 57) { // 0 ... 9
-	sum += (digitA - 48) * 16;
+	  sum += (digitA - 48) * 16;
 	} else if (digitA >= 65 && digitA <= 70) { // A ... F
-	sum += (digitA - 55) * 16;
+	  sum += (digitA - 55) * 16;
 	} else if (digitA >= 97 && digitA <= 102) { // a ... f
-	sum += (digitA - 87) * 16;
+	  sum += (digitA - 87) * 16;
 	}
 
 	if (digitB >= 48 && digitB <= 57) { // 0 ... 9
-	sum += (digitB - 48);
+	  sum += (digitB - 48);
 	} else if (digitB >= 65 && digitB <= 70) { // A ... F
-	sum += (digitB - 55);
+	  sum += (digitB - 55);
 	} else if (digitB >= 97 && digitB <= 102) { // a ... f
-	sum += (digitB - 87);
+	  sum += (digitB - 87);
 	}
 
 	return sum;
@@ -284,10 +382,13 @@ byte toByteHex(char digitA, char digitB) // only two digits
 
 void modeTurnOff() 
 {
+  Serial.println("TURNING OFF");
   for(int side = 0; side < NUM_SIDES; side++) 
   {
     colorSideSolid(side, 0, 0, 0, 0);
   }
+  
+  delay(200);
 }
 
 void modeSolid() 
@@ -327,7 +428,7 @@ void modeSolidRotating()
     updateRotation();
   }
  
-  delay(50 / SpeedUpFactor);
+  delay(25);
 }
 
 void modeGradient()
@@ -351,16 +452,11 @@ void modeParty()
   
   // The color of each point shifts over time, each at a different speed.
   uint16_t ms = millis();  
-  Serial.println("1");
   leds[(i+j)/2] = CHSV(ms / 29, 200, 255);
-  Serial.println("2");
   leds[(j+k)/2] = CHSV(ms / 41, 200, 255);
-  Serial.println("3");
   leds[(k+i)/2] = CHSV(ms / 73, 200, 255);
-  Serial.println("4");
   leds[(k+i+j)/3] = CHSV(ms / 53, 200, 255);
-  Serial.println("5");
-  delay(20 / SpeedUpFactor);
+  delay(20);
 }
 
 // --------------------------------- COLORING ---------------------------------
