@@ -25,6 +25,7 @@ initConfig();
 mqttClient.on('connect', () => {
 	// connect to all sub-topics of ~/color/...
 	// where 0 is broadcast-like for all sides and [1, 2, ..., numSides] represent the lamps' sides
+	mqttClient.subscribe(MQTT_COLOR_TOPIC);
 	mqttClient.subscribe(MQTT_COLOR_TOPIC.concat("/+"));
 	mqttClient.subscribe(MQTT_MODE_TOPIC);
 	mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC);
@@ -41,12 +42,11 @@ mqttClient.on('message', (topic, message) => {
 	
 	// color-parent-topic: Contains color-values for each side
 	} else if (topic === MQTT_COLOR_TOPIC) {
-		var rgb;
 		if (msgStr.startsWith("#")) { 
-			rgb = hexToRgb(msgStr); // convert rgb from hex, f.e. "#f34ff4"
+			colors = hexToRgb(msgStr); // convert rgb from hex, f.e. "#f34ff4"
 		} 
 		else { 
-			rgb = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
+			colors = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
 		} 
 				
 	// color-sub-topic: To update a single side or all sides with the same color at once 	
@@ -85,16 +85,27 @@ mqttClient.on('message', (topic, message) => {
 		}
 		
 		for (i = 0; i < numSides; i++) {
-			var newR = Math.round(colors[i*3] * (1 + sign * brightnessStepPerc));
-			var newG = Math.round(colors[i*3+1] * (1 + sign * brightnessStepPerc));
-			var newB = Math.round(colors[i*3+2] * (1 + sign * brightnessStepPerc));
+			var brightnessSum = colors[i*3] + colors[i*3+1] + colors[i*3+2];
+			var ratioR = colors[i*3] / brightnessSum;
+			var ratioG = colors[i*3+1] / brightnessSum;
+			var ratioB = colors[i*3+2] / brightnessSum;
+			brightnessSum = brightnessSum * (1 + sign * brightnessStepPerc);
+			var newR = ratioR * brightnessSum;
+			var newG = ratioG * brightnessSum;
+			var newB = ratioB * brightnessSum;
+			
 			// only update brightness if colors do not exceed the bounds
-			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
-				|| (sign < 0 && newR >= 1 && newG >= 1 && newB >= 1))
+			if (sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
 			{
-				colors[i*3] = newR;
-				colors[i*3+1] = newG;
-				colors[i*3+2] = newB;
+				colors[i*3] = Math.ceil(newR);
+				colors[i*3+1] = Math.ceil(newG);
+				colors[i*3+2] = Math.ceil(newB);
+			}
+			else if (sign < 0 && newR >= 0 && newG >= 0 && newB >= 0)
+			{
+				colors[i*3] = Math.floor(newR);
+				colors[i*3+1] = Math.floor(newG);
+				colors[i*3+2] = Math.floor(newB);
 			}
 		}
 		
@@ -132,7 +143,8 @@ mqttClient.on('message', (topic, message) => {
 		}
 	}
 	
-	console.log(msgStr);
+	console.log("msgStr: ".concat(msgStr));
+	console.log("colors: ".concat(colors));
 });
 
 function initConfig() {
