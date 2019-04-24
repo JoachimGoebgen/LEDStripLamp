@@ -72,17 +72,37 @@ void connectWifi()
     Serial.print("Connecting to WiFi named ");
     Serial.println(WIFI_SSID);
   #endif
-
-  WiFi.mode(WIFI_STA);
+  
   WiFi.begin(WIFI_SSID, WIFI_KEY);
-
+  WiFi.setHostname(CLIENT_NAME);
+  
+  byte c = 10;
   while (WiFi.status() != WL_CONNECTED) 
   {
-      #ifdef DEBUG 
-        Serial.print("."); 
-      #endif
-      
-      delay(500);
+      if (c == 0) // try reconnect after some time if it didn't work
+      {
+        #ifdef DEBUG
+          Serial.println("");
+          Serial.println("Reconnecting");
+        #endif
+        
+        WiFi.disconnect(true);
+        delay(1000);
+        WiFi.mode(WIFI_STA);
+        delay(1000);
+        WiFi.begin(WIFI_SSID, WIFI_KEY);
+        WiFi.setHostname(CLIENT_NAME);
+        c = 10;
+      }
+      else // wait for connection ...
+      {
+        #ifdef DEBUG 
+          Serial.print("."); 
+        #endif
+  
+        delay(500);
+        c--;
+      }
   }
 
   #ifdef DEBUG 
@@ -102,7 +122,7 @@ void connectMqtt()
       Serial.print(MQTT_SRV_IP);
     #endif
     
-    if (mqttClient.connect(CLIENT_NAME "Keypad")) 
+    if (mqttClient.connect(CLIENT_NAME)) 
     {
       #ifdef DEBUG 
         Serial.println("");
