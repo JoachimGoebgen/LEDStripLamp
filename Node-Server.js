@@ -22,7 +22,7 @@ var brightnessStepPerc = 0.1;
 initConfig();
 
 mqttClient.on('connect', () => {
-	// connect to f.e. "/home/lamp/color0", "/home/lamp/color1", ... 
+	// connect to all sub-topics of ~/color/...
 	// where 0 is broadcast-like for all sides and [1, 2, ..., numSides] represent the lamps' sides
 	mqttClient.subscribe(MQTT_COLOR_TOPIC.concat("/+"));
 	mqttClient.subscribe(MQTT_MODE_TOPIC);
@@ -47,8 +47,7 @@ mqttClient.on('message', (topic, message) => {
 		else { 
 			rgb = cleanEmptyEntries(msgStr.split(" ")); // parse rgb from string, f.e. "255 40 0"
 		} 
-		...
-		
+				
 	// color-sub-topic: To update a single side or all sides with the same color at once 	
 	} else if (topic.includes(MQTT_COLOR_TOPIC)) { 
 		var rgb;
@@ -90,7 +89,7 @@ mqttClient.on('message', (topic, message) => {
 			var newB = Math.round(colors[i*3+2] * (1 + sign * brightnessStepPerc));
 			// only update brightness if colors do not exceed the bounds
 			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
-				|| (sign < 0 && newR >= 0 && newG >= 0 && newB >= 0))
+				|| (sign < 0 && newR >= 1 && newG >= 1 && newB >= 1))
 			{
 				colors[i*3] = newR;
 				colors[i*3+1] = newG;

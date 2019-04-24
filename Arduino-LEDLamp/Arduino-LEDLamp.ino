@@ -208,7 +208,7 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
 	// + or - to incerease or decrease brightness
 	else if (strcmp(topic, MQTT_BRIGHTNESS_TOPIC) == 0)
 	{
-		updateBrightness(msg[0]);
+		//updateBrightness(msg[0]);
 	}
  
 	// color-parent-topic: Contains color-values for each side
