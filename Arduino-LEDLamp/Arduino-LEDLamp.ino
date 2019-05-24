@@ -23,11 +23,15 @@ PubSubClient mqttClient(wifiClient);
 
 CRGB leds[TOTAL_LEDS];
 
+int LedMode = 1;
+
 // 
 byte R[NUM_SIDES];
 byte G[NUM_SIDES];
 byte B[NUM_SIDES];
-int LedMode = 1;
+float Rf[NUM_SIDES];
+float Gf[NUM_SIDES];
+float Bf[NUM_SIDES];
 
 // 
 int rotationOffset = 0;
@@ -208,7 +212,7 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
 	// + or - to incerease or decrease brightness
 	else if (strcmp(topic, MQTT_BRIGHTNESS_TOPIC) == 0)
 	{
-		//updateBrightness(msg[0]);
+		updateBrightness(msg[0]);
 	}
  
 	// color-parent-topic: Contains color-values for each side
@@ -301,9 +305,18 @@ void updateColorRGB(byte rgbNr, byte sideNr, byte value)
 	{
 		switch(rgbNr)
 		{
-			case 0: R[side - 1] = value; break;
-			case 1: G[side - 1] = value; break;
-			case 2: B[side - 1] = value; break; 
+			case 0: 
+        R[side - 1] = value; 
+        Rf[side - 1] = value; 
+			  break;
+			case 1: 
+			  G[side - 1] = value; 
+        Gf[side - 1] = value; 
+        break;
+			case 2: 
+        B[side - 1] = value; 
+        Bf[side - 1] = value; 
+			  break; 
 			default: break;
 		}
 	}
@@ -329,16 +342,20 @@ void updateBrightness(byte msg)
 	{
 		for (byte i = 0; i < NUM_SIDES; i++)
 		{
-			byte newR = (byte) round(R[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
-			byte newG = (byte) round(G[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
-			byte newB = (byte) round(B[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+      float newR = Rf[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+      float newG = Gf[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+      float newB = Bf[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+      
 			// only update brightness if colors do not exceed the bounds
 			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
 				|| (sign < 0 && newR >= 0 && newG >= 0 && newB >= 0))
 			{
-				R[i] = newR;
-				G[i] = newG;
-				B[i] = newB;
+				Rf[i] = newR;
+				Gf[i] = newG;
+				Bf[i] = newB;
+        R[i] = (byte)round(newR);
+        G[i] = (byte)round(newG);
+        B[i] = (byte)round(newB);
 			}
 		}
 	}
