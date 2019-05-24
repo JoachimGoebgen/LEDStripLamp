@@ -10,7 +10,7 @@ const byte rows = 4; // nunmber of rows
 const byte cols = 4; // number of columns
 byte rowPins[rows] = {16, 17, 21, 22}; //connect to the row pinouts of the keypad
 byte colPins[cols] = {5, 23, 19, 18}; //connect to the column pinouts of the keypad
-char keys[rows][cols] = {
+char keys[cols][rows] = {
   {'1','2','3','A'},
   {'4','5','6','B'},
   {'7','8','9','C'},
@@ -36,17 +36,17 @@ void loop() {
   if (!mqttClient.connected()) { connectMqtt(); }
 
   mqttClient.loop();
-  
+
   char key = keypad.getKey();
-  if (key != NO_KEY){
-    #ifdef DEBUG 
-      Serial.println(key); 
+
+  if (key != NO_KEY && keypad.getState() == PRESSED) {
+    #ifdef DEBUG
+      Serial.println(key);
     #endif
-    
     if (key == '0') {                                   // --- 0:
       mqttClient.publish(MQTT_MODE_TOPIC, &key);    // [turn off] 0 is not used to publish preset but to turn off LED
     } else if (isDigit(key)) {                          // --- 1/2/3...:
-      mqttClient.publish(MQTT_LOADPRESET_TOPIC, &key);  	// [change preset] just publish digit (1, 2, ...) 
+      mqttClient.publish(MQTT_LOADPRESET_TOPIC, &key);    // [change preset] just publish digit (1, 2, ...) 
     } else if (isAlpha(key)) {                          // --- A/B/C/D:
       key -= 16;                                        // A/B/C/D to 1/2/3/4
       mqttClient.publish(MQTT_MODE_TOPIC, &key);    // [change mode] 1=solid, 2=rotating, 3=gradient, 4=party 
@@ -61,6 +61,7 @@ void loop() {
     }
   }
 
+  delay(50);
 }
 
 // --------------------------------- NETWORK ---------------------------------
