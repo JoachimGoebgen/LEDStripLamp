@@ -1,25 +1,33 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
-#include "FastLED.h"
 #include <WiFi.h>
+#include <Preferences.h>
+#include "FastLED.h"
 #include "PubSubClient.h"
 #include "connection_conf.h" // contains WIFI_SSID, WIFI_KEY, MQTT_SRV_IP, MQTT_SRV_PORT and all MQTT-topics
 
 FASTLED_USING_NAMESPACE
 
+#define DEBUG // if this flag is set, debug-statements get printed via Serial(9600)
+
 #define DATA_PIN        27
 #define LED_TYPE        WS2812
 #define COLOR_ORDER     GRB
 
-#define LEDS_PER_ROW    20
-#define NUM_SIDES       4 // maximum 9
-#define NUM_ROWS        3
-#define START_OFFSET    11
+#define NUM_SIDES       4 	// how many different areas you want your lamp to have: in my case 4, maximum 9.
+#define NUM_ROWS        3	// how often you wrapped your strip around the frame.
+#define LEDS_PER_ROW    20	// how many individually controllable spots there are per side in a single row (be careful: on cheaper LED-strips one controller controls multiple LEDs).
+#define START_OFFSET    11	// in case your LED-strip starts somewhere in the middle of one side and not at the edge, this is the number of spots before the first edge.
+#define BRIGHTNESS_STEP 0.1 // how much the brightness increases or decreases with one "+" or "-" message.
+#define MAX_NB_PRESETS  10 	// this much space is reserved in the Arduinos storage.
 
 #define LEDS_PER_ROUND  (LEDS_PER_ROW * NUM_SIDES)
 #define TOTAL_LEDS      (LEDS_PER_ROW * NUM_ROWS * NUM_SIDES)
+#define BYTES_PER_PRESET  (3 * NUM_SIDES + 1)
+#define EEPROM_SIZE     (MAX_NB_PRESETS * BYTES_PER_PRESET)
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
+Preferences preferences;
 
 CRGB leds[TOTAL_LEDS];
 
@@ -42,10 +50,11 @@ bool doUpdate = true;
 void setup() 
 {
   delay(1000);
-
   #ifdef DEBUG 
     Serial.begin(9600); 
   #endif
+
+  preferences.begin("presets", false);
 
   connectWifi();
   
@@ -137,47 +146,47 @@ void connectMqtt()
     if (mqttClient.connect(CLIENT_NAME)) 
     {
       mqttClient.subscribe(MQTT_MODE_TOPIC);
-      mqttClient.subscribe(MQTT_COLOR_TOPIC);
       mqttClient.subscribe(MQTT_BRIGHTNESS_TOPIC);
+      mqttClient.subscribe(MQTT_LOADPRESET_TOPIC);
+      mqttClient.subscribe(MQTT_SAVEPRESET_TOPIC);
+      mqttClient.subscribe(MQTT_COLOR_TOPIC);
       
       char subColorTopic[strlen(MQTT_COLOR_TOPIC)+3] = {0};
       strcat(subColorTopic, MQTT_COLOR_TOPIC);
       strcat(subColorTopic, "/+");
-      /*sprintf(subColorTopic, "%s%s", MQTT_COLOR_TOPIC, "/+");*/
       mqttClient.subscribe(subColorTopic);
-      Serial.println(subColorTopic);
 	  
       #ifdef DEBUG 
         Serial.println("");
         Serial.print("MQTT connected with client-name '");
         Serial.print(CLIENT_NAME);
-        Serial.print("' and subscribed to topic '");
-        Serial.print(MQTT_MODE_TOPIC);
-        Serial.print("' and to topic '");
-        Serial.print(MQTT_BRIGHTNESS_TOPIC);
-        Serial.print("' and to all sub-topics of '");
-        Serial.print(MQTT_COLOR_TOPIC);
-        Serial.println("'");
+        Serial.println("' and subscribed to topics:");
+        Serial.println(MQTT_MODE_TOPIC);
+        Serial.println(MQTT_BRIGHTNESS_TOPIC);
+        Serial.println(MQTT_LOADPRESET_TOPIC);
+        Serial.println(MQTT_SAVEPRESET_TOPIC);
+        Serial.println("and to all sub-topics of");
+        Serial.println(MQTT_COLOR_TOPIC);
       #endif
     } 
     else 
     {
-      #ifdef DEBUG 
-        Serial.println("");
-        Serial.print("MQTT connection FAILED with status-code ");
-        Serial.print(mqttClient.state());
-        Serial.print(". Trying again in ");
-      #endif
+		#ifdef DEBUG 
+		Serial.println("");
+		Serial.print("MQTT connection FAILED with status-code ");
+		Serial.print(mqttClient.state());
+		Serial.print(". Trying again in ");
+		#endif
       
-      for (int i = 5; i > 0; i--)
-      {
-        #ifdef DEBUG 
-          Serial.print(i);
-          Serial.print(" ");
-        #endif
-        
-        delay(1000);
-      }
+		for (int i = 5; i > 0; i--)
+		{
+			#ifdef DEBUG 
+			Serial.print(i);
+			Serial.print(" ");
+			#endif
+			
+			delay(1000);
+		}
     }
   }
 }
@@ -189,8 +198,8 @@ void connectMqtt()
 void receivedMsg(char* topic, byte* msg, unsigned int length)
 {
 	#ifdef DEBUG 
-		Serial.print("Message received in topic ");
-		Serial.print(topic);
+	Serial.print("Message received in topic ");
+	Serial.print(topic);
     Serial.print(" : ");
     for (byte i = 0; i < length; i++)
     {
@@ -219,32 +228,32 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
 	else if (strcmp(topic, MQTT_COLOR_TOPIC) == 0)
 	{
 		byte wordNr = 0;
-    byte digitNr = 0;
+		byte digitNr = 0;
 
-    for (unsigned int i = 0; i <= length; i++)
-    {
-      if (i == length || msg[i] == ' ') // space
-      {
-        if (digitNr == 0) { continue; } // two consecutive spaces or leading space
+		for (unsigned int i = 0; i <= length; i++)
+		{
+		  if (i == length || msg[i] == ' ') // space
+		  {
+			if (digitNr == 0) { continue; } // two consecutive spaces or leading space
 
-        if (msg[i - 7] == '#') // #HEX f.e. #ff204e #55f4e4 ...
-        { 
-          if (wordNr >= NUM_SIDES || digitNr != 7) { return; }
-          updateColorRGB(0, wordNr + 1, toNumberHex(msg[i - 6], msg[i - 5]));
-          updateColorRGB(1, wordNr + 1, toNumberHex(msg[i - 4], msg[i - 3]));
-          updateColorRGB(2, wordNr + 1, toNumberHex(msg[i - 3], msg[i - 1]));
-        }
-        else // decimals f.e. 255 120 0 241 255 60 ... (rgb-triplets)
-        {
-          if (wordNr >= NUM_SIDES * 3 || digitNr > 3) { return; }
-          updateColorRGB(wordNr % 3, wordNr / 3 + 1, toNumberDec(msg, i - digitNr, i - 1));
-        }
-        
-        digitNr = 0;
-        wordNr++;
-      }
-      else { digitNr++; }
-    }
+			if (msg[i - 7] == '#') // #HEX f.e. #ff204e #55f4e4 ...
+			{ 
+			  if (wordNr >= NUM_SIDES || digitNr != 7) { return; }
+			  updateColorRGB(0, wordNr + 1, toNumberHex(msg[i - 6], msg[i - 5]));
+			  updateColorRGB(1, wordNr + 1, toNumberHex(msg[i - 4], msg[i - 3]));
+			  updateColorRGB(2, wordNr + 1, toNumberHex(msg[i - 3], msg[i - 1]));
+			}
+			else // decimals f.e. 255 120 0 241 255 60 ... (rgb-triplets)
+			{
+			  if (wordNr >= NUM_SIDES * 3 || digitNr > 3) { return; }
+			  updateColorRGB(wordNr % 3, wordNr / 3 + 1, toNumberDec(msg, i - digitNr, i - 1));
+			}
+			
+			digitNr = 0;
+			wordNr++;
+		  }
+		  else { digitNr++; }
+		}
 	}
  
 	// color-sub-topic: To update a single side or all sides with the same color at once
@@ -282,6 +291,18 @@ void receivedMsg(char* topic, byte* msg, unsigned int length)
       else { digitNr++; }
     }
 	}
+
+ // store current state (mode and colors) into EEPROM (msg has to be a number specifying the preset-ID)
+ else if (strcmp(topic, MQTT_SAVEPRESET_TOPIC) == 0)
+ {
+    storeStateAsPreset(msg, length);
+ }
+ 
+ // load a previously stored preset from EEPROM (msg has to be a number specifying the preset-ID)
+ else if (strcmp(topic, MQTT_LOADPRESET_TOPIC) == 0)
+ {
+    loadPreset(msg, length);
+ }
 }
 
 // rgbNr: 0=red, 1=green, 2=blue
@@ -342,9 +363,9 @@ void updateBrightness(byte msg)
 	{
 		for (byte i = 0; i < NUM_SIDES; i++)
 		{
-      float newR = Rf[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
-      float newG = Gf[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
-      float newB = Bf[i] * ((float)1 + sign * BRIGHTNESS_STEP_PERC));
+      float newR = Rf[i] * ((float)1 + sign * BRIGHTNESS_STEP);
+      float newG = Gf[i] * ((float)1 + sign * BRIGHTNESS_STEP);
+      float newB = Bf[i] * ((float)1 + sign * BRIGHTNESS_STEP);
       
 			// only update brightness if colors do not exceed the bounds
 			if ((sign > 0 && newR <= 255 && newG <= 255 && newB <= 255)
@@ -361,38 +382,51 @@ void updateBrightness(byte msg)
 	}
 }
 
-byte toNumberDec(byte* msg, int from_incl, int to_incl)
+// ---------------------------- PRESET STORAGE -----------------------------
+
+void storeStateAsPreset(const byte* presetName, unsigned int len)
 {
-  int count = to_incl - from_incl + 1; // number of digits
-  byte sum = 0;
-  for (int i = 0; i < count; i++)
+  char str[len+1];
+  for (unsigned int i = 0; i < len; i++)
   {
-    sum += (msg[from_incl + i] - 48) * pow(10, count - 1 - i); // convert "char" to its represented number and sum it up depending on its place
+    str[i] = char(presetName[i]);
   }
-  return sum;
+  str[len] = '\0';
+  
+  preferences.begin(str, false);
+
+  preferences.putInt("LedMode", LedMode);
+  preferences.putBytes("R", R, NUM_SIDES);
+  preferences.putBytes("G", G, NUM_SIDES);
+  preferences.putBytes("B", B, NUM_SIDES);
+
+  preferences.end();
 }
 
-byte toNumberHex(byte digitA, byte digitB) // only two digits
+void loadPreset(const byte* presetName, unsigned int len)
 {
-	byte sum = 0;
+  char str[len+1];
+  for (unsigned int i = 0; i < len; i++)
+  {
+    str[i] = char(presetName[i]);
+  }
+  str[len] = '\0';
+  
+  preferences.begin(str, false);
 
-	if (digitA >= 48 && digitA <= 57) { // 0 ... 9
-	  sum += (digitA - 48) * 16;
-	} else if (digitA >= 65 && digitA <= 70) { // A ... F
-	  sum += (digitA - 55) * 16;
-	} else if (digitA >= 97 && digitA <= 102) { // a ... f
-	  sum += (digitA - 87) * 16;
-	}
-
-	if (digitB >= 48 && digitB <= 57) { // 0 ... 9
-	  sum += (digitB - 48);
-	} else if (digitB >= 65 && digitB <= 70) { // A ... F
-	  sum += (digitB - 55);
-	} else if (digitB >= 97 && digitB <= 102) { // a ... f
-	  sum += (digitB - 87);
-	}
-
-	return sum;
+  LedMode = preferences.getInt("LedMode", LedMode);
+  preferences.getBytes("R", R, NUM_SIDES);
+  preferences.getBytes("G", G, NUM_SIDES);
+  preferences.getBytes("B", B, NUM_SIDES);
+  
+  for (byte i = 0; i < NUM_SIDES; i++)
+  {
+	Rf[i] = (float)R[i];
+	Gf[i] = (float)G[i];
+	Bf[i] = (float)B[i];
+  }
+  
+  preferences.end();
 }
 
 // --------------------------------- MODES ---------------------------------
@@ -476,7 +510,7 @@ void modeParty()
   delay(20);
 }
 
-// --------------------------------- COLORING ---------------------------------
+// --------------------------------- LED STRIP COLORING ---------------------------------
 
 void colorSideGradient(int side, int offset, CRGB fromColor, CRGB toColor)
 {
@@ -535,4 +569,48 @@ void updateRotation()
 int next(int side) 
 {
   return (side + 1) % NUM_SIDES;
+}
+
+// -------------------------------- HELPER --------------------------------
+
+byte toNumberDec(byte* msg, int from_incl, int to_incl)
+{
+  int count = to_incl - from_incl + 1; // number of digits
+  byte sum = 0;
+  for (int i = 0; i < count; i++)
+  {
+    sum += (msg[from_incl + i] - 48) * pow(10, count - 1 - i); // convert "char" to its represented number and sum it up depending on its place
+  }
+  return sum;
+}
+
+byte toNumberHex(byte digitA, byte digitB) // only two digits
+{
+  byte sum = 0;
+
+  if (digitA >= 48 && digitA <= 57) { // 0 ... 9
+    sum += (digitA - 48) * 16;
+  } else if (digitA >= 65 && digitA <= 70) { // A ... F
+    sum += (digitA - 55) * 16;
+  } else if (digitA >= 97 && digitA <= 102) { // a ... f
+    sum += (digitA - 87) * 16;
+  }
+
+  if (digitB >= 48 && digitB <= 57) { // 0 ... 9
+    sum += (digitB - 48);
+  } else if (digitB >= 65 && digitB <= 70) { // A ... F
+    sum += (digitB - 55);
+  } else if (digitB >= 97 && digitB <= 102) { // a ... f
+    sum += (digitB - 87);
+  }
+
+  return sum;
+}
+
+void bytesToChars(const byte* bytes, unsigned int len, char* chars)
+{
+    for (unsigned int i = 0; i < len; i++)
+    {
+      chars[i] = char(bytes[i]);
+    }
 }

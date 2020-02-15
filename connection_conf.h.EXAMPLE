@@ -1,0 +1,12 @@
+#define DEBUG // the Arduino prints debug-statements to the Serial(9600)-output if this flag is set
+#define CLIENT_NAME   "some name"
+#define WIFI_SSID   "your wifi name"
+#define WIFI_KEY    "your wifi key"
+#define MQTT_SRV_IP   "the IP your MQTT-server is running on"
+#define MQTT_SRV_PORT   1833 //default
+#define BRIGHTNESS_STEP_PERC	0.1
+#define MQTT_COLOR_TOPIC    "some topic like /SmartHome/LEDStripLamp/color"
+#define MQTT_SETTINGS_TOPIC   "some topic like /SmartHome/LEDStripLamp/settings"
+#define MQTT_BRIGHTNESS_TOPIC   "some topic like /SmartHome/LEDStripLamp/brightness"
+#define MQTT_LOADPRESET_TOPIC   "some topic like /SmartHome/LEDStripLamp/loadpreset"
+#define MQTT_SAVEPRESET_TOPIC   "some topic like /SmartHome/LEDStripLamp/savepreset"
